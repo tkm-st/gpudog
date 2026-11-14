@@ -25,7 +25,7 @@ No CUDA toolkit is required. NVML is
 loaded at runtime, as is CUDA's `libcuda.so.1`, so binaries do not link the
 NVIDIA driver at build time. Discovery creates no CUDA context or device
 memory. Workspace dependencies are tokio, clap, cudarc, nvml-wrapper,
-nix, signal-hook, toml, serde, bytes, tokio-util, futures-util, anyhow and
+nix, signal-hook, toml, bytes, tokio-util, futures-util, anyhow and
 thiserror.
 
 An NVIDIA driver and a physical GPU are **not build requirements**. The

@@ -7,7 +7,7 @@ Rust or the CUDA toolkit is not a substitute for an NVIDIA driver at runtime.
 
 | Task | Required tools | GPU/driver needed? |
 | -- | -- | -- |
-| Build the client, daemon or library | Rust >= 1.88, Cargo, a native Linux linker toolchain and glibc development files | No |
+| Build the client, daemon or library crates | Rust >= 1.88, Cargo, a native Linux linker toolchain and glibc development files | No |
 | Run the Cargo tests | The build tools, `rustc` on `PATH`, and a writable repository `tmp/` | No; hardware tests may report the driver unavailable |
 | Format and lint Rust | rustfmt and Clippy | No |
 | Build the daemon image | Docker and access to the build images/dependency sources | No; the Dockerfile supplies its own Rust/native toolchain |

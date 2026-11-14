@@ -15,7 +15,6 @@ gpudog-core.workspace = true
 futures-util.workspace = true
 nix.workspace = true
 nvml-wrapper.workspace = true
-serde.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
