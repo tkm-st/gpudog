@@ -300,20 +300,23 @@ the gates where it says `verifier`, with any directory under `tmp/` as
 | Module (`crates/gpudog-lib/src/`) | Responsibility |
 | -- | -- |
 | `protocol/` (`mod`, `codec`, `tests`) | Wire format v6 and framing |
+| `nvml` | Runtime NVML loading, shared by client and daemon |
 | `peer_credentials` | `SO_PEERCRED` identity via `nix` |
-| `gpu_inventory` | NVML via `nvml-wrapper`, plus a static test double |
+| `gpu_inventory` | Daemon's NVML device inventory, plus a static test double |
 | `device_visibility` | Context-free CUDA ordinal/UUID discovery and grant validation |
 | `scheduler` | Load-ordered queue and the reservation lifecycle |
 | `service` | tokio listener and per-session state machine |
 | `client` | Client side of the protocol, `into_reservation` |
 | `cli_options`, `config` | Argument parsing, `config.toml` loading |
 | `daemon_log` | Non-blocking stderr/journal logging |
-| `dashboard` | Terminal rendering for `gpudog dash` |
-| `gpu_processes` | Managed-UUID NVML queries and host procfs facts |
+| `dashboard` | Terminal rendering of the daemon's snapshot for `gpudog dash` |
+| `gpu_processes` | Daemon's managed-UUID NVML queries and host procfs facts |
 | `process_watcher` | PID/start-time descendant cache; usage and labels are separate |
 
-Binaries: `crates/gpudog` (client) and `crates/gpudogd` (daemon, owns the
-cargo-deb metadata). Packaging steps verify with
+`lib.rs` groups the modules as shared (`protocol`, `nvml`,
+`device_visibility`), client and daemon; client and daemon modules never
+use each other. Binaries: `crates/gpudog` (client) and `crates/gpudogd`
+(daemon, owns the cargo-deb metadata). Packaging steps verify with
 `cargo deb -p gpudogd --no-build` after a release build. Plan bottom-up: `protocol`, `cli_options`, `config` and
 the `scheduler` core are testable without a daemon, GPU or sockets.
 

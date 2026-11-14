@@ -7,7 +7,7 @@
 use cudarc::driver::{result, sys};
 use nvml_wrapper::error::NvmlError;
 
-use crate::gpu_inventory::load_nvml;
+use crate::nvml::load_nvml;
 use crate::protocol::{self, Acquire, GpuSelection, Granted, MAX_GPU_COUNT};
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

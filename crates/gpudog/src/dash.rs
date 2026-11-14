@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use gpudog_lib::client::{Client, ClientError};
 use gpudog_lib::dashboard;
-use gpudog_lib::gpu_processes::{daemon_view, ProcessView};
+use gpudog_lib::dashboard::{daemon_view, ProcessView};
 use gpudog_lib::protocol::StatusReply;
 
 /// Fetches one snapshot on a fresh connection. Not one held open: the

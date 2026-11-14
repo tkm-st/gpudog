@@ -8,8 +8,34 @@
 
 use std::fmt::Write;
 
-use crate::gpu_processes::{Ownership, ProcessRow, ProcessView};
-use crate::protocol::{sanitize_display_text, ReservationInfo, StatusReply};
+use crate::protocol::{
+    sanitize_display_text, GpuProcessInfo, ProcessOwnership as Ownership, ReservationInfo,
+    StatusReply,
+};
+
+/// What the dashboard shows in its process section.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProcessView {
+    Rows(Vec<GpuProcessInfo>),
+    /// NVML could not be loaded or queried; the reason is shown, sanitised.
+    Unavailable(String),
+}
+
+/// All process identity/metadata comes from the daemon's host observation,
+/// never from a client's unrelated PID namespace or local NVML instance.
+pub fn daemon_view(status: &StatusReply) -> ProcessView {
+    if !status.observing {
+        return ProcessView::Unavailable("NVML observation bypassed (test inventory)".into());
+    }
+    if status.observation_age_ms.is_none() {
+        return ProcessView::Unavailable(if status.observation_error.is_empty() {
+            "waiting for the first GPU observation".into()
+        } else {
+            sanitize_display_text(&status.observation_error)
+        });
+    }
+    ProcessView::Rows(status.processes.clone())
+}
 
 /// A millisecond age as a human reads it at a glance: `42s`, `3m 7s`,
 /// `2h 5m`, `1d 4h`.
@@ -109,19 +135,21 @@ fn reservation_rows(list: &[ReservationInfo], queued: bool) -> Vec<Vec<String>> 
         .collect()
 }
 
-fn process_rows(rows: &[ProcessRow]) -> Vec<Vec<String>> {
+fn process_rows(rows: &[GpuProcessInfo]) -> Vec<Vec<String>> {
     let unknown = || "?".to_owned();
     rows.iter()
         .map(|row| {
             vec![
-                row.gpu.map_or_else(unknown, |gpu| gpu.to_string()),
+                row.gpu.to_string(),
                 row.pid.to_string(),
                 row.uid.map_or_else(unknown, |uid| uid.to_string()),
                 human_bytes(row.used_memory),
                 row.ownership.label().to_owned(),
-                row.command
-                    .as_deref()
-                    .map_or_else(unknown, sanitize_display_text),
+                if row.command.is_empty() {
+                    unknown()
+                } else {
+                    sanitize_display_text(&row.command)
+                },
             ]
         })
         .collect()
@@ -200,7 +228,7 @@ pub fn render(status: &StatusReply, processes: &ProcessView, refresh_seconds: u6
     );
 
     out.push_str("\nGPU processes\n");
-    let gpu_processes: &[ProcessRow] = match processes {
+    let gpu_processes: &[GpuProcessInfo] = match processes {
         ProcessView::Rows(rows) => {
             table(
                 &mut out,
@@ -233,7 +261,7 @@ pub fn render(status: &StatusReply, processes: &ProcessView, refresh_seconds: u6
                     .map_or_else(|| "-".to_owned(), |h| format!("uid {}", h.uid));
                 let unmanaged = gpu_processes
                     .iter()
-                    .filter(|r| r.gpu == Some(device.index) && r.ownership == Ownership::NotManaged)
+                    .filter(|r| r.gpu == device.index && r.ownership == Ownership::NotManaged)
                     .count();
                 if unmanaged > 0 {
                     let _ = write!(holder, " (+{unmanaged} not managed)");
@@ -313,14 +341,15 @@ mod tests {
         ProcessView::Rows(Vec::new())
     }
 
-    fn process(gpu: u32, pid: u32, ownership: Ownership) -> ProcessRow {
-        ProcessRow {
-            gpu: Some(gpu),
+    fn process(gpu: u32, pid: u32, ownership: Ownership) -> GpuProcessInfo {
+        GpuProcessInfo {
+            gpu,
             pid,
             uid: Some(2000),
             used_memory: Some(3 << 29),
-            command: Some(b"train".to_vec()),
+            command: b"train".to_vec(),
             ownership,
+            ..GpuProcessInfo::default()
         }
     }
 
@@ -531,9 +560,9 @@ mod tests {
             process(0, 4243, Ownership::Managed),
             process(1, 9001, Ownership::NotManaged),
             process(1, 9002, Ownership::WrongGpu),
-            ProcessRow {
+            GpuProcessInfo {
                 uid: None,
-                command: None,
+                command: Vec::new(),
                 used_memory: None,
                 ..process(1, 9003, Ownership::Unknown)
             },
@@ -606,8 +635,8 @@ mod tests {
 
     #[test]
     fn escape_sequences_in_process_names_never_reach_the_terminal() {
-        let processes = ProcessView::Rows(vec![ProcessRow {
-            command: Some((0..=255).collect()),
+        let processes = ProcessView::Rows(vec![GpuProcessInfo {
+            command: (0..=255).collect(),
             ..process(0, 1, Ownership::NotManaged)
         }]);
         let text = render(&StatusReply::default(), &processes, 5);

@@ -2,7 +2,6 @@ use std::path::Path;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use super::*;
-use crate::protocol::DeviceInfo;
 
 /// A fake procfs under the workspace `tmp/`, removed on drop.
 struct FakeProc(PathBuf);
@@ -48,36 +47,6 @@ impl Drop for FakeProc {
     }
 }
 
-fn on_gpu(nvml_index: u32, pid: u32) -> GpuProcess {
-    GpuProcess {
-        nvml_index,
-        gpu_uuid: format!("GPU-{nvml_index}"),
-        pid,
-        used_memory: Some(1 << 30),
-    }
-}
-
-fn holder(pid: i32, gpus: &[u32]) -> ReservationInfo {
-    ReservationInfo {
-        id: 1,
-        uid: 1000,
-        pid,
-        gpus: gpus.to_vec(),
-        num_gpus: gpus.len() as u32,
-        age_ms: 0,
-        position: 0,
-        command: b"gpudog run".to_vec(),
-    }
-}
-
-fn status(holders: Vec<ReservationInfo>) -> StatusReply {
-    StatusReply {
-        device_count: 2,
-        holders,
-        ..StatusReply::default()
-    }
-}
-
 #[test]
 fn identity_start_time_survives_parentheses_and_proc_reads_are_bounded() {
     let proc = FakeProc::new();
@@ -109,156 +78,6 @@ fn stat_parsing_survives_a_command_name_with_spaces_and_parentheses() {
     assert_eq!(procfs.uid(50), Some(7));
     assert_eq!(procfs.comm(50).unwrap(), b"a) (b c)");
     assert_eq!(procfs.parent(51), None);
-}
-
-#[test]
-fn a_descendant_of_a_holder_on_a_reserved_gpu_is_managed() {
-    let proc = FakeProc::new();
-    // init -> gpudog run (100) -> bash (101) -> python (102)
-    proc.process(100, 1, 1000, b"gpudog")
-        .process(101, 100, 1000, b"bash")
-        .process(102, 101, 1000, b"python");
-    let rows = classify(
-        &[on_gpu(0, 102), on_gpu(0, 100)],
-        &status(vec![holder(100, &[0])]),
-        &proc.procfs(),
-    );
-    assert_eq!(rows.len(), 2);
-    assert!(rows.iter().all(|r| r.ownership == Ownership::Managed));
-    assert_eq!(rows[1].pid, 102);
-    assert_eq!(rows[1].uid, Some(1000));
-    assert_eq!(rows[1].command.as_deref(), Some(&b"python"[..]));
-}
-
-#[test]
-fn a_process_with_no_holder_ancestor_is_not_managed() {
-    let proc = FakeProc::new();
-    proc.process(100, 1, 1000, b"gpudog")
-        .process(200, 1, 2000, b"rogue")
-        .process(201, 200, 2000, b"child");
-    let rows = classify(
-        &[on_gpu(1, 201)],
-        &status(vec![holder(100, &[0])]),
-        &proc.procfs(),
-    );
-    assert_eq!(rows[0].ownership, Ownership::NotManaged);
-    assert_eq!(rows[0].uid, Some(2000));
-}
-
-#[test]
-fn a_holder_descendant_on_a_gpu_it_did_not_reserve_is_flagged() {
-    let proc = FakeProc::new();
-    proc.process(100, 1, 1000, b"gpudog")
-        .process(101, 100, 1000, b"python");
-    let rows = classify(
-        &[on_gpu(1, 101)],
-        &status(vec![holder(100, &[0])]),
-        &proc.procfs(),
-    );
-    assert_eq!(rows[0].ownership, Ownership::WrongGpu);
-}
-
-#[test]
-fn an_unreadable_process_is_unknown_not_guessed() {
-    let proc = FakeProc::new();
-    let rows = classify(
-        &[on_gpu(0, 999)],
-        &status(vec![holder(100, &[0])]),
-        &proc.procfs(),
-    );
-    assert_eq!(rows[0].ownership, Ownership::Unknown);
-    assert_eq!(rows[0].uid, None);
-    assert_eq!(rows[0].command, None);
-}
-
-#[test]
-fn a_holder_reported_as_pid_one_does_not_claim_every_process() {
-    let proc = FakeProc::new();
-    proc.process(200, 1, 2000, b"rogue");
-    let rows = classify(
-        &[on_gpu(0, 200)],
-        &status(vec![holder(1, &[0]), holder(0, &[0]), holder(-1, &[0])]),
-        &proc.procfs(),
-    );
-    assert_eq!(rows[0].ownership, Ownership::NotManaged);
-}
-
-#[test]
-fn a_parent_loop_terminates() {
-    let proc = FakeProc::new();
-    proc.process(300, 301, 0, b"a").process(301, 300, 0, b"b");
-    let rows = classify(&[on_gpu(0, 300)], &status(vec![]), &proc.procfs());
-    assert_eq!(rows[0].ownership, Ownership::NotManaged);
-}
-
-#[test]
-fn gpus_are_numbered_by_the_daemon_when_uuids_match() {
-    let proc = FakeProc::new();
-    proc.process(100, 1, 1000, b"gpudog");
-    let mut snapshot = status(vec![holder(100, &[1])]);
-    // The daemon numbers NVML's device 0 as its device 1.
-    snapshot.devices = vec![
-        DeviceInfo {
-            index: 0,
-            name: b"x".to_vec(),
-            uuid: b"GPU-1".to_vec(),
-        },
-        DeviceInfo {
-            index: 1,
-            name: b"x".to_vec(),
-            uuid: b"GPU-0".to_vec(),
-        },
-    ];
-    let rows = classify(&[on_gpu(0, 100)], &snapshot, &proc.procfs());
-    assert_eq!(rows[0].gpu, Some(1));
-    assert_eq!(rows[0].ownership, Ownership::Managed);
-}
-
-#[test]
-fn a_gpu_the_daemon_does_not_list_is_never_managed() {
-    let proc = FakeProc::new();
-    proc.process(100, 1, 1000, b"gpudog")
-        .process(101, 100, 1000, b"python");
-    let mut snapshot = status(vec![holder(100, &[0])]);
-    snapshot.devices = vec![DeviceInfo {
-        index: 0,
-        name: b"x".to_vec(),
-        uuid: b"GPU-0".to_vec(),
-    }];
-    // NVML index 0 on this host, but a UUID the daemon has never heard of.
-    let stranger = GpuProcess {
-        gpu_uuid: "GPU-elsewhere".to_owned(),
-        ..on_gpu(0, 101)
-    };
-    let rows = classify(&[stranger], &snapshot, &proc.procfs());
-    assert_eq!(rows[0].gpu, None);
-    assert_eq!(rows[0].ownership, Ownership::WrongGpu);
-}
-
-#[test]
-fn a_reused_holder_pid_owned_by_another_user_is_not_a_match() {
-    let proc = FakeProc::new();
-    // The holder (uid 1000) exited; pid 100 now belongs to uid 2000.
-    proc.process(100, 1, 2000, b"impostor")
-        .process(101, 100, 2000, b"python");
-    let rows = classify(
-        &[on_gpu(0, 101)],
-        &status(vec![holder(100, &[0])]),
-        &proc.procfs(),
-    );
-    assert_eq!(rows[0].ownership, Ownership::NotManaged);
-}
-
-#[test]
-fn rows_are_ordered_by_gpu_then_pid() {
-    let proc = FakeProc::new();
-    let rows = classify(
-        &[on_gpu(1, 5), on_gpu(0, 9), on_gpu(0, 3)],
-        &status(vec![]),
-        &proc.procfs(),
-    );
-    let order: Vec<(Option<u32>, u32)> = rows.iter().map(|r| (r.gpu, r.pid)).collect();
-    assert_eq!(order, [(Some(0), 3), (Some(0), 9), (Some(1), 5)]);
 }
 
 #[test]

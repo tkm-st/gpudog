@@ -89,7 +89,8 @@ See `notes/device-identity.md` for the exact current behaviour.
 *   `dash` is terminal-only and opens a fresh connection per refresh.
 *   Command text is untrusted display data, sanitized at the boundary and
     in renderers. Status snapshots truncate with a warning rather than fail.
-*   `gpu_processes.rs` queries NVML and walks `/proc` on the dashboard host.
+*   The daemon queries NVML and walks `/proc` (`gpu_processes`,
+    `process_watcher`); `dash` only renders the daemon's snapshot.
     Classification is best-effort, not authorization or scheduling input.
     Double-fork, unreadable procfs and truncated holder snapshots limit it;
     the current UID match is not a complete PID-reuse defense.

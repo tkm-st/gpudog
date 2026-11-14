@@ -13,21 +13,29 @@ notes/              design notes for maintainers
 
 ## Modules
 
+The library's modules fall into three groups. The shared ones (`protocol`,
+`nvml`, `device_visibility`) depend on no other group. Client modules
+(`client`, `cli_options`, `cuda_visible_devices`, `dashboard`) and daemon
+modules (the rest) never use each other.
+
 | Module | Responsibility |
 | -- | -- |
 | `protocol` | Message types and pure encode/decode over byte buffers. No I/O. |
 | `protocol::codec` | Length-prefixed framing through tokio-util's codec. |
+| `nvml` | Loads NVML at runtime, for both the client and the daemon. |
+| `device_visibility` | The CUDA view of the devices: ordinals and UUIDs without a CUDA context, and checking a grant against it. |
 | `peer_credentials` | Reads the client's uid and pid with `SO_PEERCRED`. |
-| `gpu_inventory` | Lists GPUs through runtime-loaded nvml-wrapper. Includes a static double for tests and `--num-gpus`. |
+| `gpu_inventory` | The daemon's list of GPUs through NVML. Includes a static double for tests and `--num-gpus`. |
 | `scheduler` | The reservation lifecycle: grant, queue, timeout, release and per-user limits. Pure logic; the caller passes in the current time. |
 | `service` | The listener and one session state machine per connection. Connects the socket layer to the scheduler. |
 | `client` | The client side of a session: connect, handshake, ping, acquire and status. |
 | `cli_options` | Parses and checks the `gpudog run` options. |
+| `cuda_visible_devices` | Writes and reads UUID lists in `CUDA_VISIBLE_DEVICES`. |
 | `config` | Loads `config.toml`, merges it with the defaults and checks it. |
 | `daemon_log` | Bounded queue and writer thread for stderr/journal logging. |
 | `gpu_processes` | Managed-UUID NVML process queries and bounded host procfs facts. |
 | `process_watcher` | PID/start-time root/descendant tracking; labels are separate from observed usage. |
-| `dashboard` | Renders a status snapshot as text. |
+| `dashboard` | Renders the daemon's status snapshot, including its process list, as text. |
 
 ## The connection is the lock
 

@@ -5,12 +5,8 @@
 //! Labels are display metadata, but all observed GPU usage blocks new grants
 //! regardless of classification. Dash consumes daemon snapshots; clients
 //! never query their own unrelated NVML/procfs process view.
-//!
-//! The stateless `classify` helper remains for legacy library callers; it
-//! cannot track PID reuse/reparenting like the daemon's `ProcessTracker`.
 
 use std::collections::BTreeMap;
-use std::collections::HashMap;
 use std::io::Read;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -20,8 +16,7 @@ use nvml_wrapper::error::NvmlError as RawNvmlError;
 use nvml_wrapper::struct_wrappers::device::ProcessInfo;
 use nvml_wrapper::Nvml;
 
-use crate::gpu_inventory::{load_nvml, NvmlError};
-use crate::protocol::{ReservationInfo, StatusReply};
+use crate::nvml::{load_nvml, NvmlError};
 
 /// One process holding a context on one GPU, as NVML reports it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -495,11 +490,12 @@ pub struct Collected {
 /// How a GPU process relates to the daemon's reservations.
 pub use crate::protocol::ProcessOwnership as Ownership;
 
-/// One dashboard row.
+/// One observed GPU process, as the daemon keeps it between observations.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProcessRow {
-    /// The daemon's index for this GPU when the UUID matches; NVML's when
-    /// the daemon lists no devices; `None` for a GPU the daemon does not list.
+    /// The scheduler slot of its GPU; the service translates it to a daemon
+    /// GPU number when it builds a snapshot. `None` for a GPU it does not
+    /// manage.
     pub gpu: Option<u32>,
     pub pid: u32,
     pub uid: Option<u32>,
@@ -511,117 +507,6 @@ pub struct ProcessRow {
 
 /// Bounds the parent walk: a corrupt or hostile tree cannot loop forever.
 pub const MAX_ANCESTRY: usize = 128;
-
-fn owning_holder<'a>(
-    pid: u32,
-    holders: &HashMap<u32, &'a ReservationInfo>,
-    procfs: &ProcFs,
-) -> Option<&'a ReservationInfo> {
-    let mut current = pid;
-    for _ in 0..MAX_ANCESTRY {
-        // The uid check guards against a holder pid reused since the snapshot.
-        if let Some(holder) = holders
-            .get(&current)
-            .filter(|h| procfs.uid(current) == Some(h.uid))
-        {
-            return Some(holder);
-        }
-        match procfs.parent(current) {
-            Some(parent) if parent > 1 && parent != current => current = parent,
-            _ => return None,
-        }
-    }
-    None
-}
-
-/// Labels every GPU process against the snapshot's holders. Rows are
-/// ordered by GPU, then pid.
-pub fn classify(
-    processes: &[GpuProcess],
-    status: &StatusReply,
-    procfs: &ProcFs,
-) -> Vec<ProcessRow> {
-    // Pids 0 and 1 cannot be a `gpudog run` client; matching them would
-    // claim every process on the machine.
-    let holders: HashMap<u32, &ReservationInfo> = status
-        .holders
-        .iter()
-        .filter_map(|h| u32::try_from(h.pid).ok().filter(|&p| p > 1).map(|p| (p, h)))
-        .collect();
-    let mut rows: Vec<ProcessRow> = processes
-        .iter()
-        .map(|process| {
-            // Without a device list (a daemon run with `--num-gpus`) NVML's
-            // index is the best guess. With one, an unlisted UUID has no
-            // daemon index at all, and guessing could claim a reservation.
-            let gpu = if status.devices.is_empty() {
-                Some(process.nvml_index)
-            } else {
-                status
-                    .devices
-                    .iter()
-                    .find(|d| d.uuid == process.gpu_uuid.as_bytes())
-                    .map(|d| d.index)
-            };
-            let ownership = if procfs.parent(process.pid).is_none() {
-                Ownership::Unknown
-            } else {
-                match (gpu, owning_holder(process.pid, &holders, procfs)) {
-                    (Some(gpu), Some(holder)) if holder.gpus.contains(&gpu) => Ownership::Managed,
-                    (_, Some(_)) => Ownership::WrongGpu,
-                    (_, None) => Ownership::NotManaged,
-                }
-            };
-            ProcessRow {
-                gpu,
-                pid: process.pid,
-                uid: procfs.uid(process.pid),
-                used_memory: process.used_memory,
-                command: procfs.comm(process.pid),
-                ownership,
-            }
-        })
-        .collect();
-    rows.sort_by_key(|row| (row.gpu, row.pid));
-    rows
-}
-
-/// What the dashboard shows in its process section.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ProcessView {
-    Rows(Vec<ProcessRow>),
-    /// NVML could not be loaded or queried; the reason is shown, sanitised.
-    Unavailable(String),
-}
-
-/// All process identity/metadata comes from the daemon's host observation,
-/// never from a client's unrelated PID namespace or local NVML instance.
-pub fn daemon_view(status: &StatusReply) -> ProcessView {
-    if !status.observing {
-        return ProcessView::Unavailable("NVML observation bypassed (test inventory)".into());
-    }
-    if status.observation_age_ms.is_none() {
-        return ProcessView::Unavailable(if status.observation_error.is_empty() {
-            "waiting for the first GPU observation".into()
-        } else {
-            crate::protocol::sanitize_display_text(&status.observation_error)
-        });
-    }
-    ProcessView::Rows(
-        status
-            .processes
-            .iter()
-            .map(|p| ProcessRow {
-                gpu: Some(p.gpu),
-                pid: p.pid,
-                uid: p.uid,
-                used_memory: p.used_memory,
-                command: (!p.command.is_empty()).then(|| p.command.clone()),
-                ownership: p.ownership,
-            })
-            .collect(),
-    )
-}
 
 #[cfg(test)]
 mod tests;

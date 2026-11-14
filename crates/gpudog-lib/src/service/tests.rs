@@ -50,26 +50,26 @@ fn start(gpus: u32) -> Service {
 }
 
 type ObservedState =
-    Arc<Mutex<Result<Vec<crate::gpu_processes::GpuProcess>, crate::gpu_inventory::NvmlError>>>;
+    Arc<Mutex<Result<Vec<crate::gpu_processes::GpuProcess>, crate::nvml::NvmlError>>>;
 
 struct ControlledSource(ObservedState);
 impl GpuProcessSource for ControlledSource {
     fn processes(
         &self,
         _uuids: &[String],
-    ) -> Result<Vec<crate::gpu_processes::GpuProcess>, crate::gpu_inventory::NvmlError> {
+    ) -> Result<Vec<crate::gpu_processes::GpuProcess>, crate::nvml::NvmlError> {
         self.0.lock().unwrap().clone()
     }
 }
 
 fn observed_service(
-    initial: Result<Vec<crate::gpu_processes::GpuProcess>, crate::gpu_inventory::NvmlError>,
+    initial: Result<Vec<crate::gpu_processes::GpuProcess>, crate::nvml::NvmlError>,
 ) -> (Service, ObservedState) {
     observed_service_logging(initial, discard_log())
 }
 
 fn observed_service_logging(
-    initial: Result<Vec<crate::gpu_processes::GpuProcess>, crate::gpu_inventory::NvmlError>,
+    initial: Result<Vec<crate::gpu_processes::GpuProcess>, crate::nvml::NvmlError>,
     log: LogSink,
 ) -> (Service, ObservedState) {
     let observed = Arc::new(Mutex::new(initial));
@@ -161,9 +161,7 @@ async fn failed_observation_blocks_new_grants_and_still_expires_queue_requests()
     } else {
         assert!(is_granted(&first));
     }
-    *source.lock().unwrap() = Err(crate::gpu_inventory::NvmlError(
-        "mock observer failure".into(),
-    ));
+    *source.lock().unwrap() = Err(crate::nvml::NvmlError("mock observer failure".into()));
     eventually(|| !service.snapshot().observation_error.is_empty()).await;
     assert!(service.with_scheduler(|s| s.holds(1)));
     let mut waiter = Client::ready(&service).await;
@@ -191,7 +189,7 @@ async fn failed_observation_blocks_new_grants_and_still_expires_queue_requests()
 
 #[tokio::test]
 async fn failed_initial_observation_never_grants_from_an_unchecked_inventory() {
-    let (service, _) = observed_service(Err(crate::gpu_inventory::NvmlError("unavailable".into())));
+    let (service, _) = observed_service(Err(crate::nvml::NvmlError("unavailable".into())));
     let mut client = Client::ready(&service).await;
     assert!(is_queued(
         &client
@@ -281,7 +279,7 @@ impl GpuProcessSource for SlowSource {
     fn processes(
         &self,
         _uuids: &[String],
-    ) -> Result<Vec<crate::gpu_processes::GpuProcess>, crate::gpu_inventory::NvmlError> {
+    ) -> Result<Vec<crate::gpu_processes::GpuProcess>, crate::nvml::NvmlError> {
         self.started.store(true, Ordering::SeqCst);
         let deadline = Instant::now() + Duration::from_secs(2);
         while !self.release.load(Ordering::SeqCst) && Instant::now() < deadline {
@@ -1552,7 +1550,7 @@ impl GpuProcessSource for GatedSource {
     fn processes(
         &self,
         uuids: &[String],
-    ) -> Result<Vec<crate::gpu_processes::GpuProcess>, crate::gpu_inventory::NvmlError> {
+    ) -> Result<Vec<crate::gpu_processes::GpuProcess>, crate::nvml::NvmlError> {
         self.calls.lock().unwrap().push(uuids.to_vec());
         let deadline = Instant::now() + Duration::from_secs(5);
         let mut waiting = false;
@@ -1569,7 +1567,7 @@ impl GpuProcessSource for GatedSource {
                 *self.blocked.lock().unwrap() += 1;
             }
             if Instant::now() > deadline {
-                break Err(crate::gpu_inventory::NvmlError("gate never opened".into()));
+                break Err(crate::nvml::NvmlError("gate never opened".into()));
             }
             std::thread::sleep(Duration::from_millis(2));
         };
