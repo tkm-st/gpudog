@@ -1,0 +1,8 @@
+# cargo-deb maintainer-script templates. The systemd parts of the scripts
+# are generated from [package.metadata.deb.systemd-units] and inserted at
+# #DEBHELPER#. postinst adds the notice that an upgrade did not restart
+# gpudogd. copyright is not a script: it is installed as
+# /usr/share/doc/gpudog/copyright and must carry LICENSE's text, indented.
+# lintian-overrides is not read by cargo-deb here either: an asset installs
+# it as /usr/share/lintian/overrides/gpudog. changelog is the Debian
+# changelog: add an entry for every released version.

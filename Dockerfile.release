@@ -1,0 +1,65 @@
+# syntax=docker/dockerfile:1
+
+# Build/test only: Debian 10 is EOL. Never deploy this image as a daemon.
+# Native linking against glibc 2.28, not a Bookworm build relabelled as portable.
+FROM rust:1.88.0-bookworm@sha256:af306cfa71d987911a781c37b59d7d67d934f49684058f96cf72079c3626bfe0 AS rust-toolchain
+FROM debian:10@sha256:58ce6f1271ae1c8a2006ff7d3e54e9874d839f573d8009c20154ad0f2fb0a225 AS release-builder
+RUN printf '%s\n' \
+        'deb http://archive.debian.org/debian buster main' \
+        'deb http://archive.debian.org/debian-security buster/updates main' \
+        > /etc/apt/sources.list \
+    && apt-get -o Acquire::Check-Valid-Until=false update \
+    && apt-get install -y --no-install-recommends \
+        build-essential binutils ca-certificates dpkg-dev pkg-config python3 liblzma-dev \
+    && rm -rf /var/lib/apt/lists/*
+# Keep signature checking enabled; only archived metadata expiry is relaxed.
+COPY --from=rust-toolchain /usr/local/rustup /usr/local/rustup
+COPY --from=rust-toolchain /usr/local/cargo /usr/local/cargo
+ENV RUSTUP_HOME=/usr/local/rustup CARGO_HOME=/usr/local/cargo \
+    RUSTUP_TOOLCHAIN=1.88.0 PATH=/usr/local/cargo/bin:$PATH
+RUN test "$(getconf GNU_LIBC_VERSION)" = 'glibc 2.28' \
+    && rustc --version && cargo --version \
+    && cargo install cargo-deb --version 3.8.0 --locked
+WORKDIR /src
+COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+COPY crates crates
+# Tests read the packaged template and the Debian changelog (include_str!).
+COPY packaging/config.toml packaging/config.toml
+COPY packaging/debian/changelog packaging/debian/changelog
+RUN cargo build --locked --release --workspace
+COPY scripts/check-release-elf.py scripts/check-release-elf.py
+RUN python3 scripts/check-release-elf.py target/release/gpudog target/release/gpudogd
+RUN cargo test --locked --workspace \
+    && cargo test --locked --workspace --release
+COPY packaging packaging
+COPY LICENSE LICENSE
+COPY scripts/third-party-licenses.py scripts/test-third-party-licenses.py scripts/
+RUN python3 scripts/test-third-party-licenses.py
+COPY scripts/package-release.py scripts/package-release.py
+RUN python3 scripts/package-release.py
+
+# A fresh minimum runtime: no Rust/build dependencies from release-builder.
+FROM debian:10@sha256:58ce6f1271ae1c8a2006ff7d3e54e9874d839f573d8009c20154ad0f2fb0a225 AS minimum-runtime
+ENV NVIDIA_VISIBLE_DEVICES=all NVIDIA_DRIVER_CAPABILITIES=compute,utility
+COPY --from=release-builder /out /release
+RUN test "$(getconf GNU_LIBC_VERSION)" = 'glibc 2.28' \
+    && /release/bin/gpudog --help && /release/bin/gpudogd --help \
+    && /release/bin/gpudog --version && /release/bin/gpudogd --version \
+    && printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d \
+    && chmod 755 /usr/sbin/policy-rc.d \
+    && dpkg -i /release/*.deb \
+    && cmp /release/bin/gpudog /usr/bin/gpudog \
+    && cmp /release/bin/gpudogd /usr/bin/gpudogd
+
+# Mock ABI remains isolated, but is now linked against the minimum libc too.
+FROM release-builder AS minimum-test-drivers
+RUN mkdir -p /test-drivers \
+    && rustc --edition=2021 --crate-type=cdylib -O \
+        crates/gpudog/tests/support/mock_driver.rs -o /test-drivers/libmock-driver.so \
+    && ln -s libmock-driver.so /test-drivers/libcuda.so \
+    && ln -s libmock-driver.so /test-drivers/libcuda.so.1 \
+    && ln -s libmock-driver.so /test-drivers/libnvidia-ml.so.1
+
+# Local export happens only after minimum-runtime installation succeeds.
+FROM scratch AS artifacts
+COPY --from=minimum-runtime /release /

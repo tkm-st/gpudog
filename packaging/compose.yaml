@@ -1,0 +1,40 @@
+# Run from the GPU host with Docker Compose >= 2.30.
+# See docs/user-guide/container-clients.md for required environment variables.
+services:
+  gpudogd:
+    build:
+      context: ..
+    image: gpudogd:local
+    gpus: all
+    userns_mode: host
+    pid: host
+    network_mode: none
+    environment:
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    volumes:
+      - type: bind
+        source: ${GPUDOG_SOCKET_DIRECTORY:?Set the root-owned socket directory}
+        target: /run/gpudog
+  client:
+    profiles: [client]
+    build:
+      context: ..
+      target: client
+    image: gpudog-client:local
+    gpus: all
+    userns_mode: host
+    network_mode: none
+    user: ${GPUDOG_UID:?Set the invoking host UID}:${GPUDOG_GID:?Set the invoking host GID}
+    working_dir: /work
+    environment:
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    volumes:
+      - type: bind
+        source: ${GPUDOG_SOCKET_DIRECTORY:?Set the root-owned socket directory}
+        target: /run/gpudog
+        read_only: true
+      - type: bind
+        source: ${GPUDOG_WORK_DIRECTORY:?Set the workload directory}
+        target: /work
+    depends_on: [gpudogd]
+    command: [--help]

@@ -1,0 +1,32 @@
+[Unit]
+Description=GPUDog reservation daemon
+Documentation=https://tkm-st.github.io/gpudog/administration/daemon/
+# Ordering only, not a dependency: start after the NVIDIA persistence daemon
+# when it is installed, so NVML is usually ready. If it is not ready yet,
+# startup fails and Restart= retries below.
+After=nvidia-persistenced.service
+# Never give up retrying: at boot the driver can take longer than the
+# default start limit (5 starts in 10 s) allows.
+StartLimitIntervalSec=0
+
+[Service]
+ExecStart=/usr/bin/gpudogd
+# `systemctl reload gpudogd` reloads config.toml without a restart.
+ExecReload=/bin/kill -HUP $MAINPID
+# Creates /run/gpudog (root-owned, 0755) for the socket before start, and
+# removes it on stop. gpudogd refuses a socket directory others can write.
+RuntimeDirectory=gpudog
+RuntimeDirectoryMode=0755
+# Logs go to stderr; lines carry <N> syslog priorities for the journal.
+StandardError=journal
+SyslogIdentifier=gpudogd
+Restart=on-failure
+# Slow enough that a configuration error, retried forever, does not flood
+# the journal; fast enough that a late driver is picked up soon.
+RestartSec=10s
+# A SIGHUP that arrives before gpudogd installs its handler ends it, and
+# systemd counts death by SIGHUP as clean; restart it anyway.
+RestartForceExitStatus=SIGHUP
+
+[Install]
+WantedBy=multi-user.target

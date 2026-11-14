@@ -1,0 +1,64 @@
+name: Bug report
+description: Something in gpudog or gpudogd does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a security vulnerability, do not use this form; see SECURITY.md.
+        Remove other users' commands, uids and pids from anything you paste.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `gpudog --version` and `gpudogd --version`.
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How was GPUDog installed?
+      options:
+        - Debian package
+        - Release tarball
+        - Docker image built from the Dockerfile
+        - Built from source
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: System
+      description: Distribution, NVIDIA driver version and GPU models (for example from `nvidia-smi -L`).
+  - type: textarea
+    id: steps
+    attributes:
+      label: What did you run?
+      description: The commands, and only the lines of the configuration you changed.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: >-
+        A copy of one `gpudog dash` screen, and the daemon log around the
+        problem (`journalctl -u gpudogd` or `docker logs gpudogd`; ask your
+        administrator if you cannot read it). Both show every user's uid,
+        pid and command line: keep only your own rows and log lines, and
+        remove other users' uid, pid and `command=` text.
+      render: text
+  - type: checkboxes
+    id: redacted
+    attributes:
+      label: Privacy
+      options:
+        - label: I removed other users' commands, uids and pids from what I pasted.
+          required: true

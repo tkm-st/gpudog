@@ -1,0 +1,43 @@
+# cargo-deny configuration: `cargo deny --locked check` (CI runs it; see
+# docs/developer/building.md). Keep [licenses] in step with ALLOWED in
+# scripts/third-party-licenses.py, which writes the release notices.
+
+[graph]
+# The only target the release artifacts are built for.
+targets = ["x86_64-unknown-linux-gnu"]
+all-features = false
+
+[advisories]
+# RustSec advisories, fetched at run time. Any vulnerability, unmaintained
+# or unsound notice fails the check until it is fixed or listed in `ignore`
+# with a reason.
+version = 2
+yanked = "deny"
+# An unmaintained or unsound notice on any crate in the graph, direct or not,
+# fails the check. "all" is the default for unmaintained only; unsound
+# defaults to workspace crates, so do not drop either line.
+unmaintained = "all"
+unsound = "all"
+# Each entry: { id = "RUSTSEC-YYYY-NNNN", reason = "why it does not apply" }
+ignore = []
+
+[licenses]
+version = 2
+allow = ["MIT", "Apache-2.0", "ISC", "Unicode-3.0", "Unlicense"]
+confidence-threshold = 0.9
+# Unlicense comes only from memchr ("Unlicense OR MIT"), which
+# third-party-licenses.py lists from cargo metadata but cargo-deny's
+# feature-resolved graph does not contain; it stays listed to match ALLOWED.
+unused-allowed-license = "allow"
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# Workspace path dependencies have no version, and are not published.
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

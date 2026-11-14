@@ -1,0 +1,27 @@
+#!/bin/sh
+set -e
+
+# An upgrade does not restart gpudogd: a restart loses every reservation, and
+# the new daemon can hand a reserved GPU that is not in use yet to someone
+# else. The administrator restarts it when the GPUs are idle.
+#
+# Probed before the generated code below, which starts a stopped daemon:
+# only a daemon that was already running is still the previous version.
+was_running=
+if [ "$1" = "configure" ] && [ -n "$2" ] && [ -d /run/systemd/system ] &&
+    systemctl --quiet is-active gpudogd.service 2>/dev/null; then
+    was_running=1
+fi
+
+#DEBHELPER#
+
+# A reinstall of the same version leaves nothing out of date.
+if [ -n "$was_running" ] &&
+    ! dpkg --compare-versions "$2" eq "$(dpkg-query -W -f='${Version}' gpudog 2>/dev/null)"; then
+    cat >&2 <<'EOF' || true
+gpudog: gpudogd was not restarted; the version installed before is still running.
+gpudog: Clients from this package may not work with it until it restarts.
+gpudog: Restart it when no job holds or waits for a GPU (see `gpudog dash`):
+gpudog:     sudo systemctl restart gpudogd
+EOF
+fi

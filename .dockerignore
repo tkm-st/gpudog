@@ -1,0 +1,23 @@
+# Keep the build context small and reproducible.
+target/
+tmp/
+.env
+.worktrees/
+build/
+externals/
+compile_commands.json
+site/
+.venv/
+.git/
+.github/
+.claude/
+.cache/
+.vscode/
+notes/
+docs/
+# Release packaging needs the systemd unit and Debian maintainer scripts.
+*.md
+!README.md
+.markdownlint.json
+Dockerfile
+.dockerignore

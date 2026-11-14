@@ -1,0 +1,42 @@
+=== unknown_key
+warning ignoring unknown setting 'not_a_setting'
+value socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=4
+=== unknown_keys_sorted
+warning ignoring 'max_queued_per_uid': expected an integer
+warning ignoring unknown setting 'alpha'
+warning ignoring unknown setting 'zeta'
+value socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== wrong_types
+warning ignoring 'require_secure_directory': expected true or false
+warning ignoring 'max_queued_per_uid': expected an integer
+value socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== float_for_integer
+warning ignoring 'max_queued_per_uid': expected an integer
+value socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== queued_out_of_range
+warning ignoring 'max_queued_per_uid': must be between 0 and 1000000
+value socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== table_section
+warning ignoring unknown setting 'service'
+value socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== dotted_key
+warning ignoring unknown setting 'service'
+value socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== inline_table
+warning ignoring 'max_queued_per_uid': expected an integer
+value socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== array_value
+warning ignoring 'max_queued_per_uid': expected an integer
+value socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== bom_prefix
+value socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=4
+=== crlf_lines
+value socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=3 max_queued_per_uid=4
+=== syntax_double_equals
+error (line 1, column 22)
+=== syntax_on_line_three
+error (line 3, column 9)
+=== duplicate_key
+error (line 2, column 1)
+=== control_char_in_comment
+error (line 1, column 26)

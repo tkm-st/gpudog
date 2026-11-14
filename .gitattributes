@@ -1,0 +1,2 @@
+# This compatibility fixture intentionally contains CRLF input cases.
+crates/gpudog-lib/tests/golden/config_cases.txt whitespace=cr-at-eol

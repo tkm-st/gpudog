@@ -1,0 +1,17 @@
+.cache/
+.vscode/
+tmp/
+# Holds API tokens in local checkouts; must never be committed.
+.env
+target/
+site/
+.venv/
+# Retired build artifacts, refused by scripts/precommit-check.sh.
+build/
+externals/
+compile_commands.json
+# Agent worktrees (.worktrees/<slug> on wip/<slug>).
+.worktrees/
+__pycache__/
+# Per-user tool state (for example Claude Code); never tracked.
+.claude/

@@ -1,0 +1,63 @@
+=== empty
+value log_directory=/var/log/gpudog socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== readme_three
+value log_directory=/tmp/gpudog-logs socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== all_keys
+value log_directory=/l socket_path=/s.sock socket_mode=600 require_secure_directory=0 max_connections=32 max_connections_per_uid=4 handshake_timeout_ms=2500 max_held_per_uid=2 max_queued_per_uid=3
+=== mode_decimal_looking
+value log_directory=/var/log/gpudog socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== mode_zero
+value log_directory=/var/log/gpudog socket_path=/run/gpudog/gpudogd.sock socket_mode=0 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== mode_symbolic
+warning ignoring 'socket_mode': expected an octal permission string such as "0666"
+value log_directory=/var/log/gpudog socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== mode_too_big
+warning ignoring 'socket_mode': expected an octal permission string such as "0666"
+value log_directory=/var/log/gpudog socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== mode_leading_space
+value log_directory=/var/log/gpudog socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== mode_plus
+value log_directory=/var/log/gpudog socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== mode_minus_zero
+value log_directory=/var/log/gpudog socket_path=/run/gpudog/gpudogd.sock socket_mode=0 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== mode_minus_one
+warning ignoring 'socket_mode': expected an octal permission string such as "0666"
+value log_directory=/var/log/gpudog socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== mode_trailing_space
+warning ignoring 'socket_mode': expected an octal permission string such as "0666"
+value log_directory=/var/log/gpudog socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== mode_empty
+warning ignoring 'socket_mode': expected an octal permission string such as "0666"
+value log_directory=/var/log/gpudog socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== mode_integer
+warning ignoring 'socket_mode': expected a string
+value log_directory=/var/log/gpudog socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== over_cli_bounds
+warning ignoring 'max_connections': must be between 0 and 1000000
+warning ignoring 'handshake_timeout_ms': must be between 0 and 3600000
+value log_directory=/var/log/gpudog socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== negative_cap
+warning ignoring 'max_connections': must be between 0 and 1000000
+value log_directory=/var/log/gpudog socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== datetime_value
+warning ignoring 'log_directory': expected a string
+value log_directory=/var/log/gpudog socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== zeros
+value log_directory=/var/log/gpudog socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=0 max_connections_per_uid=0 handshake_timeout_ms=0 max_held_per_uid=0 max_queued_per_uid=0
+=== hex_and_underscores
+value log_directory=/var/log/gpudog socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=32 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=10
+=== literal_string
+value log_directory=/var/log/gpudog socket_path=C:\raw\path socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== multiline_string
+value log_directory=/var/log/x socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== unicode_escape
+value log_directory=/var/log/gpudog socket_path=/tmp/é.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== syntax_bare_words
+error (line 1, column 6)
+=== duplicate_table
+error (line 2, column 1)
+=== nul_in_string
+value log_directory=/var/log/gpudog socket_path=/tmp/ socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
+=== empty_key
+warning ignoring unknown setting ''
+value log_directory=/var/log/gpudog socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8

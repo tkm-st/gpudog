@@ -1,0 +1,39 @@
+=== unknown_key
+max_queued_per_uid = 4
+not_a_setting = 1
+=== unknown_keys_sorted
+zeta = 1
+alpha = 2
+max_queued_per_uid = "x"
+=== wrong_types
+max_queued_per_uid = "nineteen"
+require_secure_directory = 1
+=== float_for_integer
+max_queued_per_uid = 3.0
+=== queued_out_of_range
+max_queued_per_uid = -1
+=== table_section
+[service]
+max_queued_per_uid = 4
+=== dotted_key
+service.max_queued_per_uid = 4
+=== inline_table
+max_queued_per_uid = { value = 4 }
+=== array_value
+max_queued_per_uid = [4]
+=== bom_prefix
+﻿max_queued_per_uid = 4
+=== crlf_lines
+max_queued_per_uid = 4
+max_held_per_uid = 3
+=== syntax_double_equals
+max_queued_per_uid = = 4
+=== syntax_on_line_three
+max_queued_per_uid = 4
+
+broken =
+=== duplicate_key
+max_queued_per_uid = 4
+max_queued_per_uid = 5
+=== control_char_in_comment
+max_queued_per_uid = 4 # bell

@@ -1,0 +1,68 @@
+=== empty
+
+=== readme_three
+log_directory = "/tmp/gpudog-logs"
+=== all_keys
+log_directory = "/l"
+socket_path = "/s.sock"
+socket_mode = "0600"
+require_secure_directory = false
+max_connections = 32
+max_connections_per_uid = 4
+handshake_timeout_ms = 2500
+max_held_per_uid = 2
+max_queued_per_uid = 3
+=== mode_decimal_looking
+socket_mode = "666"
+=== mode_zero
+socket_mode = "0"
+=== mode_symbolic
+socket_mode = "rw-rw-rw-"
+=== mode_too_big
+socket_mode = "7777"
+=== mode_leading_space
+socket_mode = " 0666"
+=== mode_plus
+socket_mode = "+0666"
+=== mode_minus_zero
+socket_mode = "-0"
+=== mode_minus_one
+socket_mode = "-1"
+=== mode_trailing_space
+socket_mode = "0666 "
+=== mode_empty
+socket_mode = ""
+=== mode_integer
+socket_mode = 438
+=== over_cli_bounds
+max_connections = 2000000000
+handshake_timeout_ms = 999999999
+=== negative_cap
+max_connections = -1
+=== datetime_value
+log_directory = 1979-05-27T07:32:00Z
+=== zeros
+max_connections = 0
+max_connections_per_uid = 0
+handshake_timeout_ms = 0
+max_held_per_uid = 0
+max_queued_per_uid = 0
+=== hex_and_underscores
+max_connections = 0x20
+max_queued_per_uid = 1_0
+=== literal_string
+socket_path = 'C:\raw\path'
+=== multiline_string
+log_directory = """
+/var/log/x"""
+=== unicode_escape
+socket_path = "/tmp/\u00e9.sock"
+=== syntax_bare_words
+this is not toml at all
+=== duplicate_table
+[a]
+[a]
+=== nul_in_string
+socket_path = "/tmp/\u0000.sock"
+=== empty_key
+"" = 1

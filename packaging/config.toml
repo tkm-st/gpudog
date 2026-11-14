@@ -1,0 +1,39 @@
+# gpudogd configuration.
+#
+# Every setting below is commented out and shows its default (`devices`
+# shows an example), so this file changes nothing until you uncomment a
+# line. Every key is described in the Configuration page of the GPUDog
+# administration guide (docs/administration/configuration.md in the source).
+#
+# Apply changes with `sudo systemctl reload gpudogd`, then check the journal:
+# a refused file is only logged ("configuration reload failed; ...").
+# Keep this file owned by root and not writable by group or others.
+
+# GPUs one user may hold at once, and requests one user may have waiting.
+# A request may keep as many free GPUs as it asks for while it waits, so set
+# max_held_per_uid below the number of GPUs to keep one user from idling
+# the whole machine.
+# max_held_per_uid = 8
+# max_queued_per_uid = 8
+
+# Client connections at once, in total and from one user.
+# max_connections = 256
+# max_connections_per_uid = 16
+
+# Milliseconds a client may take for each message before it asks for GPUs.
+# handshake_timeout_ms = 10000
+
+# Milliseconds between GPU process observations.
+# watch_unmanaged_ms = 1000
+
+# GPUs this daemon manages, as UUIDs from `nvidia-smi -L`. Default: every
+# GPU it sees at startup. A reload can only add GPUs seen at startup, and
+# deleting the line again manages every one of them. Example, not a default:
+# replace the UUID with your own.
+# devices = ["GPU-8f6a1c2d-0000-1111-2222-333344445555"]
+
+# The socket. Changes to these three need `sudo systemctl restart gpudogd`,
+# which ends every reservation: restart only when no job holds a GPU.
+# socket_path = "/run/gpudog/gpudogd.sock"
+# socket_mode = "0666"
+# require_secure_directory = true

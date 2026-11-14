@@ -1,0 +1,42 @@
+/* GPUDog documentation theme: green highlights and stronger headings. */
+
+:root {
+  --gd-heading-accent: #4caf50;
+  --gd-strong-fg: #2e7d32;
+}
+
+[data-md-color-scheme="default"][data-md-color-primary="green"] {
+  /* Built-in green links (#4caf50) are too light on white. */
+  --md-typeset-a-color: var(--gd-strong-fg);
+}
+
+[data-md-color-scheme="slate"] {
+  --gd-strong-fg: #81c784;
+}
+
+/* Page headings */
+.md-typeset h1 {
+  font-weight: 700;
+  color: var(--md-default-fg-color);
+  border-left: 0.3rem solid var(--gd-heading-accent);
+  padding-left: 0.6rem;
+}
+
+.md-typeset h2 {
+  font-weight: 700;
+  border-bottom: 0.1rem solid var(--gd-heading-accent);
+  padding-bottom: 0.2rem;
+}
+
+/* Sidebar section titles (navigation.sections) */
+.md-nav--primary .md-nav__item--section > .md-nav__link {
+  font-weight: 700;
+  color: var(--gd-strong-fg);
+}
+
+/* Active sidebar and table-of-contents entries */
+.md-nav__link--active,
+.md-nav__item .md-nav__link--active {
+  font-weight: 700;
+  color: var(--gd-strong-fg);
+}

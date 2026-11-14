@@ -1,0 +1,79 @@
+[package]
+name = "gpudogd"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish.workspace = true
+# Also the deb's synopsis, which must not start with the package name.
+description = "daemon and client for exclusive GPU reservations on shared machines"
+
+[dependencies]
+gpudog-lib.workspace = true
+clap.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+futures-util.workspace = true
+nix.workspace = true
+tokio-util.workspace = true
+
+[lints]
+workspace = true
+
+[package.metadata.deb]
+# One package with both binaries. Built with `cargo deb -p gpudogd` after
+# `cargo build --release --workspace` (see
+# AGENTS.md); `target/release/` paths resolve to the real target dir.
+name = "gpudog"
+maintainer = "Takuma Saito <33742727+tkm-st@users.noreply.github.com>"
+section = "admin"
+priority = "optional"
+extended-description = """\
+gpudogd arbitrates exclusive GPU reservations between local users over a \
+Unix socket; `gpudog run` holds a reservation for the life of a command. \
+NVML (libnvidia-ml.so.1) is loaded at runtime, so the NVIDIA driver is not a \
+package dependency."""
+depends = "$auto"
+maintainer-scripts = "../../packaging/debian"
+# Debian changelog; its top entry must be this version with revision -1
+# (see tests/packaging.rs).
+changelog = "../../packaging/debian/changelog"
+assets = [
+    ["target/release/gpudog", "usr/bin/", "755"],
+    ["target/release/gpudogd", "usr/bin/", "755"],
+    # cargo-deb marks files under etc/ as conffiles: an upgrade keeps the
+    # administrator's edits, and only purge removes the file.
+    ["../../packaging/config.toml", "etc/gpudog/config.toml", "644"],
+    # Replaces cargo-deb's generated copyright file, which does not indent
+    # the license text as the machine-readable format requires.
+    ["../../packaging/debian/copyright", "usr/share/doc/gpudog/copyright", "644"],
+    ["../../packaging/debian/lintian-overrides", "usr/share/lintian/overrides/gpudog", "644"],
+]
+
+# Installs packaging/gpudogd.service to /usr/lib/systemd/system/ and writes
+# the maintainer scripts: daemon-reload, enable and start on install, stop
+# on remove. An upgrade neither stops nor restarts a running daemon, since a
+# restart loses every reservation; packaging/debian/postinst tells the
+# administrator to restart it when the GPUs are idle.
+[package.metadata.deb.systemd-units]
+unit-scripts = "../../packaging"
+unit-name = "gpudogd"
+enable = true
+start = true
+restart-after-upgrade = false
+stop-on-upgrade = false
+
+# cargo-deb's automatic ELF dependency mapping does not include libgcc_s.
+# Support Debian 10's libgcc1 and modern distributions' libgcc-s1 explicitly.
+[package.metadata.deb.variants.glibc-228]
+name = "gpudog"
+depends = "$auto, libgcc-s1 | libgcc1 (>= 1:4.2)"
+# Release packages only: scripts/package-release.py writes the file first.
+# `append` keeps the base assets, which a variant `assets` would replace.
+merge-assets.append = [
+    ["target/release/THIRD-PARTY-LICENSES", "usr/share/doc/gpudog/THIRD-PARTY-LICENSES", "644"],
+]

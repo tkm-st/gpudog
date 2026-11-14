@@ -1,0 +1,86 @@
+# Build: uvx zensical build --clean; preview: uvx zensical serve.
+
+[project]
+site_name = "GPUDog"
+site_description = "An easy-to-use GPU lock for shared Linux machines"
+docs_dir = "docs"
+site_dir = "site"
+extra_css = ["stylesheets/extra.css"]
+nav = [
+  { "Home" = "index.md" },
+  { "Getting started" = "getting-started.md" },
+  { "Installation" = "installation.md" },
+  { "Concepts" = "concepts.md" },
+  { "User guide" = [
+    "user-guide/run.md",
+    "user-guide/health.md",
+    "user-guide/dashboard.md",
+    "user-guide/container-clients.md",
+  ] },
+  { "Administration" = [
+    "administration/daemon.md",
+    "administration/configuration.md",
+    "administration/logging.md",
+    "administration/unmanaged-processes.md",
+    "administration/security.md",
+  ] },
+  { "Troubleshooting" = "troubleshooting.md" },
+  { "Developer guide" = [
+    "developer/building.md",
+    "developer/releases.md",
+    "developer/architecture.md",
+    "developer/protocol.md",
+    "developer/gpu-visibility.md",
+    "developer/documentation.md",
+  ] },
+  { "Quick reference" = [
+    "quickstart/environment.md",
+    "quickstart/installation.md",
+    "quickstart/running.md",
+    "advanced/daemon-config.md",
+    "advanced/cli-options.md",
+  ] },
+]
+
+[project.theme]
+language = "en"
+icon.logo = "lucide/dog"
+features = [
+  "content.code.copy",
+  "navigation.footer",
+  "navigation.indexes",
+  "navigation.instant",
+  "navigation.path",
+  "navigation.sections",
+  "navigation.top",
+  "navigation.tracking",
+  "search.highlight",
+]
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+primary = "green"
+accent = "green"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+primary = "green"
+accent = "green"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to light mode"
+
+[project.markdown_extensions]
+admonition = {}
+attr_list = {}
+def_list = {}
+md_in_html = {}
+tables = {}
+toc.permalink = true
+pymdownx.details = {}
+pymdownx.highlight = {}
+pymdownx.inlinehilite = {}
+pymdownx.superfences = {}

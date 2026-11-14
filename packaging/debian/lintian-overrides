@@ -1,0 +1,13 @@
+# postinst asks `systemctl is-active` whether the previous gpudogd still
+# runs, to say that an upgrade did not restart it; deb-systemd-invoke
+# cannot answer that.
+gpudog: maintainer-script-calls-systemctl [postinst:*]
+
+# The commands document themselves with --help and in the GPUDog docs site
+# (Homepage); man pages are not written yet.
+gpudog: no-manual-page [usr/bin/gpudog]
+gpudog: no-manual-page [usr/bin/gpudogd]
+
+# Not uploaded to Debian, so there is no ITP bug to close. lintian raises
+# this only while the changelog has one entry: remove it with the second.
+gpudog: initial-upload-closes-no-bugs [usr/share/doc/gpudog/changelog.Debian.gz:1]
