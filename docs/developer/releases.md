@@ -223,10 +223,10 @@ that, a published release has no way to redeploy its site; the next stable
 release updates it.
 
 If an upload of release files fails, the release stays a draft. While it
-is a draft, rerunning the workflow can replace its attachments and complete
+is a draft, **Re-run failed jobs** replaces its attachments and completes
 publication; an already published release is never overwritten. The
-release artifacts are also kept for seven days; after that, rerun all jobs
-of a draft's run to rebuild and revalidate them.
+release artifacts are also kept for seven days; after that, **Re-run all
+jobs** of the draft's run rebuilds and revalidates them.
 Checksums are rechecked on download but are not a cryptographic signature.
 
 `SHA256SUMS` covers the tar archive, the Debian package and the two

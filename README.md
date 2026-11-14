@@ -37,9 +37,9 @@ Before 1.0, releases make no compatibility promise; upgrade `gpudog` and
 To install a release, see
 [From a GitHub release](docs/installation.md#from-a-github-release).
 
-The full documentation is in [`docs/`](docs/index.md). The site at
-<https://tkm-st.github.io/gpudog/> shows it for the latest release, from
-the first stable release on:
+The full documentation is in [`docs/`](docs/index.md). From the first
+stable release on, the site at <https://tkm-st.github.io/gpudog/> shows the
+documentation of the latest stable release:
 
 *   [Getting started](docs/getting-started.md)
 *   [Installation](docs/installation.md) and [concepts](docs/concepts.md)
