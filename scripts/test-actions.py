@@ -229,5 +229,55 @@ class ReleaseNotesTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
 
 
+class PagesTests(unittest.TestCase):
+    """The site deploy keeps Pages permissions away from source and builds."""
+
+    JOBS = WORKFLOW['jobs']
+    CI = yaml.safe_load((ROOT / '.github/workflows/ci.yml').read_text())
+
+    @staticmethod
+    def runs(job):
+        return '\n'.join(step.get('run', '') for step in job['steps'])
+
+    def test_only_stable_published_releases_deploy(self):
+        pages = self.JOBS['pages']
+        # An exact match: a later `always()` would deploy after a failure.
+        self.assertEqual(pages['if'], "needs.version.outputs.prerelease == 'false'")
+        self.assertEqual(set(pages['needs']), {'version', 'publish', 'docs'})
+
+    def test_the_deploy_job_runs_one_pinned_action_and_nothing_else(self):
+        pages = self.JOBS['pages']
+        self.assertEqual(pages['permissions'], {'pages': 'write', 'id-token': 'write'})
+        self.assertEqual(len(pages['steps']), 1)
+        step = pages['steps'][0]
+        self.assertNotIn('run', step)
+        self.assertRegex(step['uses'], r'^actions/deploy-pages@[0-9a-f]{40}$')
+        self.assertEqual(pages['environment']['name'], 'github-pages')
+        self.assertIn(f"steps.{step['id']}.outputs.page_url", pages['environment']['url'])
+        self.assertEqual(pages['concurrency'], {'group': 'pages', 'cancel-in-progress': False})
+
+    def test_the_build_job_has_read_only_access(self):
+        docs = self.JOBS['docs']
+        self.assertNotIn('permissions', docs)
+        self.assertEqual(WORKFLOW['permissions'], {'contents': 'read'})
+        checkout = next(step for step in docs['steps']
+                        if step.get('uses', '').startswith('actions/checkout@'))
+        self.assertIs(checkout['with']['persist-credentials'], False)
+
+    def test_the_site_artifact_outlives_a_rerun_window(self):
+        upload = next(step for step in self.JOBS['docs']['steps']
+                      if step.get('uses', '').startswith('actions/upload-pages-artifact@'))
+        self.assertRegex(upload['uses'], r'@[0-9a-f]{40}$')
+        self.assertEqual(upload['with']['path'], 'site')
+        self.assertGreaterEqual(int(upload['with']['retention-days']), 7)
+
+    def test_the_site_builds_with_the_ci_pins(self):
+        ci = '\n'.join(self.runs(job) for job in self.CI['jobs'].values())
+        for pin in ('uv==0.12.3', 'zensical==0.0.74'):
+            with self.subTest(pin=pin):
+                self.assertIn(pin, self.runs(self.JOBS['docs']))
+                self.assertIn(pin, ci)
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

@@ -103,3 +103,46 @@ jobs:
           gh release upload "$RELEASE_TAG" --clobber \
             ./*.tar.gz ./*.deb SHA256SUMS dependencies.txt toolchain.txt
           gh release edit "$RELEASE_TAG" --draft=false --prerelease="$PRERELEASE" --latest=false
+
+  docs:
+    name: Build documentation site
+    needs: version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install documentation tools
+        run: |
+          python3 -m venv tmp/docs-tools
+          tmp/docs-tools/bin/pip install uv==0.12.3
+      - name: Build documentation
+        run: tmp/docs-tools/bin/uvx --from zensical==0.0.74 zensical build --clean
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+          # A failed deploy can be rerun ("Re-run failed jobs") while this lasts.
+          retention-days: 7
+
+  pages:
+    name: Deploy documentation site
+    needs: [version, publish, docs]
+    # Prereleases never replace the site.
+    if: needs.version.outputs.prerelease == 'false'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # Deploys run one at a time, in the order their tags reach this job.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      # No source checkout or build runs with Pages permissions.
+      - id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

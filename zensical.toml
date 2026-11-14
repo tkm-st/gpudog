@@ -3,6 +3,7 @@
 [project]
 site_name = "GPUDog"
 site_description = "An easy-to-use GPU lock for shared Linux machines"
+site_url = "https://tkm-st.github.io/gpudog/"
 docs_dir = "docs"
 site_dir = "site"
 extra_css = ["stylesheets/extra.css"]

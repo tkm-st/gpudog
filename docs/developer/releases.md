@@ -97,15 +97,24 @@ make a version a prerelease.
 Before publishing:
 
 1.  Enable GitHub Actions and allow the pinned official checkout, cache,
-    Node.js setup, artifact upload and artifact download Actions.
+    Node.js setup, artifact upload and artifact download Actions, plus
+    `actions/upload-pages-artifact`, `actions/deploy-pages` and the
+    `actions/upload-artifact` version that `upload-pages-artifact` calls
+    (v7.0.0 for v5.0.0).
 2.  Protect release tags with a repository ruleset so only release maintainers
     can create or modify them. Restrict changes to `.github/workflows/` through
     your normal review policy. A person who can push release tags can trigger
     publication of that commit; the workflow does not require `main` ancestry.
-3.  Update the workspace version in `Cargo.toml`, run `cargo update -w` so
+3.  Set up GitHub Pages for the documentation site. Pages needs a public
+    repository (a private one needs a paid plan, and its site is still
+    public). In **Settings > Pages**, set the source to **GitHub Actions**.
+    In **Settings > Environments > github-pages**, add the tag pattern `v*`
+    under **Selected branches and tags**: by default the environment
+    accepts only the default branch and refuses a tag's deploy.
+4.  Update the workspace version in `Cargo.toml`, run `cargo update -w` so
     `Cargo.lock` follows (the documented builds use `--locked`), and commit
     both.
-4.  Add an entry for it at the top of `packaging/debian/changelog`, headed
+5.  Add an entry for it at the top of `packaging/debian/changelog`, headed
     `gpudog (<deb version>) unstable; urgency=medium`, where the deb
     version is the workspace version with `-1` appended, as cargo-deb
     writes it: `0.0.2` becomes `0.0.2-1`. A prerelease whose part after the
@@ -124,7 +133,7 @@ Before publishing:
     The `quick` gate's `cargo test` fails until the header has that version
     and the distribution `unstable` (`dch` without `-D` writes
     `UNRELEASED`).
-5.  In `CHANGELOG.md`, rename `## [<version>] - Unreleased` to
+6.  In `CHANGELOG.md`, rename `## [<version>] - Unreleased` to
     `## [<version>] - YYYY-MM-DD`, and check that it lists every change to
     the protocol, configuration, command-line options, messages and log
     lines. The release notes are this section and the `Compatibility`
@@ -133,11 +142,11 @@ Before publishing:
     the `0.0.2` section while it is still `Unreleased`, and its release
     page then shows that heading. After a release, add
     `## [<next version>] - Unreleased` above it for the changes that follow.
-6.  With the second Debian changelog entry, remove the
+7.  With the second Debian changelog entry, remove the
     `initial-upload-closes-no-bugs` override from
     `packaging/debian/lintian-overrides`; `lintian -I` reports it as
     `unused-override` if it stays.
-7.  Merge the intended changes and confirm CI is green. Create a tag at that
+8.  Merge the intended changes and confirm CI is green. Create a tag at that
     exact commit and push it explicitly:
 
     ```shell
@@ -181,7 +190,25 @@ less likely, rerun CI on the release commit just before tagging.
 Only the publication job receives `contents: write` through the automatic
 `GITHUB_TOKEN`; no personal access credential is needed. It does not check
 out or execute repository source. All validation jobs have read-only access.
-No image is pushed to GHCR, no website is deployed, and no server is updated.
+No image is pushed to GHCR and no server is updated.
+
+The documentation site at <https://tkm-st.github.io/gpudog/> is deployed by
+the same workflow. A read-only job builds it from the tagged commit, with
+the same Zensical version as CI, and uploads it as a Pages artifact. After
+the release is published, a separate job deploys that artifact. Only this
+job gets the `pages` and `id-token` write permissions that a Pages deploy
+needs, and it runs no repository source. Prereleases build and upload the site but never deploy
+it, so the first stable tag is the first real test of the Pages settings
+from step 3. Every stable tag replaces the whole site, in the order the
+tags reach the deploy job: a tag on an older release line puts that
+line's documentation back.
+
+The deploy runs after the release is public, so a deploy failure leaves
+the release published without updated documentation. Fix the cause (usually
+the Pages settings), then use **Re-run failed jobs**, never **Re-run all
+jobs**: the publication job refuses an already published release, and the
+deploy is skipped after it. The site artifact is kept for seven days; after
+that, the documentation is updated by the next stable release.
 
 If an upload fails, the release stays a draft. Rerunning the workflow can
 replace draft attachments and complete publication, but an already published

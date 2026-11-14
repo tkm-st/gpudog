@@ -37,7 +37,8 @@ Before 1.0, releases make no compatibility promise; upgrade `gpudog` and
 To install a release, see
 [From a GitHub release](docs/installation.md#from-a-github-release).
 
-The full documentation is in [`docs/`](docs/index.md):
+The full documentation is at <https://tkm-st.github.io/gpudog/> and in
+[`docs/`](docs/index.md):
 
 *   [Getting started](docs/getting-started.md)
 *   [Installation](docs/installation.md) and [concepts](docs/concepts.md)
