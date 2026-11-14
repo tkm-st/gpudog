@@ -12,11 +12,13 @@ publish.workspace = true
 description = "daemon and client for exclusive GPU reservations on shared machines"
 
 [dependencies]
-gpudog-lib.workspace = true
+gpudog-core.workspace = true
+gpudog-daemon.workspace = true
 clap.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
+gpudog-client.workspace = true
 futures-util.workspace = true
 nix.workspace = true
 tokio-util.workspace = true

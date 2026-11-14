@@ -4,7 +4,7 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand};
-use gpudog_lib::protocol::PROTOCOL_VERSION;
+use gpudog_core::protocol::PROTOCOL_VERSION;
 
 const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), " (protocol v6)");
 const _: () = assert!(PROTOCOL_VERSION == 6, "update VERSION");

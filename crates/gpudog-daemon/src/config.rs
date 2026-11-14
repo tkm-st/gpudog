@@ -19,8 +19,8 @@ use nix::errno::Errno;
 use nix::fcntl::OFlag;
 use toml::{Table, Value};
 
-use crate::protocol::{is_valid_gpu_uuid, same_uuid, sanitize_display_text};
 use crate::service::ServiceConfig;
+use gpudog_core::protocol::{is_valid_gpu_uuid, same_uuid, sanitize_display_text};
 
 /// Everything `config.toml` can set.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

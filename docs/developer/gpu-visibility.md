@@ -37,8 +37,8 @@ consumers built with `panic=abort` cannot recover from loader panics.
 request: numeric lists and empty count candidates still need resolution.
 
 ```rust
-use gpudog_lib::cli_options::{build_acquire, RunOptions};
-use gpudog_lib::device_visibility::VisibleDevices;
+use gpudog_client::cli_options::{build_acquire, RunOptions};
+use gpudog_core::device_visibility::VisibleDevices;
 
 let visible = VisibleDevices::probe()?;
 let parsed = build_acquire(&RunOptions {

@@ -1,7 +1,7 @@
 //! UUID list rendering/parsing. Visibility and ordinal resolution belong to
 //! `device_visibility`; this module never replaces inherited restrictions.
 
-use crate::protocol::{is_valid_gpu_uuid, same_uuid};
+use gpudog_core::protocol::{is_valid_gpu_uuid, same_uuid};
 
 pub fn render(uuids: &[String]) -> String {
     uuids.join(",")

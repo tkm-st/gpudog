@@ -9,7 +9,7 @@ mod run;
 use std::process::ExitCode;
 
 use clap::Parser;
-use gpudog_lib::cli_options::RunOptions;
+use gpudog_client::cli_options::RunOptions;
 
 use cli::{Cli, Command};
 

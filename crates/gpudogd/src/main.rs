@@ -11,16 +11,16 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use clap::Parser;
-use gpudog_lib::config::{
+use gpudog_core::protocol::{MAX_GPU_COUNT, PROTOCOL_VERSION};
+use gpudog_daemon::config::{
     DaemonConfig, DEFAULT_CONFIG_PATH, LOG_DIRECTORY_OBSOLETE, MAX_CONNECTIONS_LIMIT,
     MAX_HANDSHAKE_TIMEOUT_MS,
 };
-use gpudog_lib::daemon_log::DaemonLog;
-use gpudog_lib::gpu_inventory::{
+use gpudog_daemon::daemon_log::DaemonLog;
+use gpudog_daemon::gpu_inventory::{
     select_devices, GpuDevice, GpuInventory, NvmlInventory, StaticInventory,
 };
-use gpudog_lib::protocol::{MAX_GPU_COUNT, PROTOCOL_VERSION};
-use gpudog_lib::service::{LogLevel, LogSink, Service, ShownDevice};
+use gpudog_daemon::service::{LogLevel, LogSink, Service, ShownDevice};
 use tokio::signal::unix::{signal, SignalKind};
 
 const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), " (protocol v6)");

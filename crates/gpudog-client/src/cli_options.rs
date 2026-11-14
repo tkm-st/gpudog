@@ -4,7 +4,7 @@
 //! unit-testable without a daemon. Errors are CLI-ready sentences without
 //! the `gpudog: ` prefix.
 
-use crate::protocol::{
+use gpudog_core::protocol::{
     is_valid_gpu_uuid, same_uuid, sanitize_display_text, Acquire, GpuSelection, MAX_COMMAND_SIZE,
     MAX_GPU_COUNT, MAX_TIMEOUT_MS,
 };
@@ -262,7 +262,7 @@ pub fn build_acquire(options: &RunOptions) -> Result<Acquire, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::{encode, Message};
+    use gpudog_core::protocol::{encode, Message};
 
     /// Success means "a request the codec accepts", so every success is
     /// checked against `encode`.
@@ -275,7 +275,7 @@ mod tests {
                 .map(|i| format!("GPU-static-{i}"))
                 .collect::<Vec<_>>()
         };
-        let view = crate::device_visibility::VisibleDevices::from_uuids(uuids).unwrap();
+        let view = gpudog_core::device_visibility::VisibleDevices::from_uuids(uuids).unwrap();
         assert!(encode(&Message::from(view.prepare_acquire(&request).unwrap())).is_ok());
         request
     }

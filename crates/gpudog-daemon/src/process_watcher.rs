@@ -6,7 +6,7 @@ use crate::gpu_inventory::GpuDevice;
 use crate::gpu_processes::{
     GpuProcess, Ownership, ProcessFacts, ProcessIdentity, ProcessRow, MAX_DESCENDANTS,
 };
-use crate::protocol::{same_uuid, sanitize_display_text, MAX_COMMAND_SIZE};
+use gpudog_core::protocol::{same_uuid, sanitize_display_text, MAX_COMMAND_SIZE};
 
 #[derive(Debug, Clone)]
 pub struct ReservationRoot {

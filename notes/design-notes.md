@@ -72,7 +72,7 @@ relies on a few cargo-deb behaviours that are easy to break.
 ### Logging
 
 *   There are no log files. `gpudogd` logs to stderr for the systemd journal
-    (`crates/gpudog-lib/src/daemon_log.rs`).
+    (`crates/gpudog-daemon/src/daemon_log.rs`).
 *   When `JOURNAL_STREAM` is set, each line is `<N>message` (6 access,
     4 warning, 3 error), so `journalctl -u gpudogd -p warning` works;
     otherwise `gpudogd: <level>: message`.
@@ -92,7 +92,7 @@ relies on a few cargo-deb behaviours that are easy to break.
 
 ### Configuration
 
-*   `crates/gpudog-lib/tests/config_compat.rs` checks every fragment in
+*   `crates/gpudog-daemon/tests/config_compat.rs` checks every fragment in
     `tests/golden/config_cases.txt` against `config_recorded_results.txt`:
     the same warnings and values, or the same error line. The results are
     a frozen record of an earlier loader and are never regenerated.
@@ -134,9 +134,10 @@ relies on a few cargo-deb behaviours that are easy to break.
 ### NVML
 
 *   nvml-wrapper loads the bare `libnvidia-ml.so` by default, which exists
-    only with the -dev package. `NvmlInventory::probe` tries
-    `libnvidia-ml.so.1` (what the container runtime injects) first, through
-    `Nvml::builder().lib_path(..)`.
+    only with the -dev package. `gpudog_core::nvml::load_nvml`, used by the
+    daemon's inventory and process observation and by the client's CUDA
+    view, tries `libnvidia-ml.so.1` (what the container runtime injects)
+    first, through `Nvml::builder().lib_path(..)`.
 
 ### Packaging
 

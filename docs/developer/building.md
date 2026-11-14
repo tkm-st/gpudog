@@ -47,7 +47,7 @@ The binaries are `target/debug/gpudog`, `target/debug/gpudogd`, and their
 isolated build.
 
 Unit tests are in each module; integration tests live in `crates/*/tests/`.
-Run a subset with `cargo test --locked -p gpudog-lib scheduler`. Test the
+Run a subset with `cargo test --locked -p gpudog-daemon scheduler`. Test the
 Release profile for scheduler, service and lifetime changes. Repeat
 timing-sensitive service and CLI tests when those paths change.
 
@@ -222,8 +222,9 @@ $ python3 scripts/release-check.py
 
 ## Protocol regression fixtures
 
-`crates/gpudog-lib/tests/protocol_golden.rs` checks the v6 wire contract,
-and `config_compat.rs` checks config compatibility. Fixtures are
+`crates/gpudog-core/tests/protocol_golden.rs` checks the v6 wire contract,
+and `crates/gpudog-daemon/tests/config_compat.rs` checks config
+compatibility. Fixtures are
 kept in this repository.
 `scripts/gen-golden-v6.py` generates current frames with its own Python
 encoder, not the Rust codec, so the two check each other. The v3 to v5

@@ -2,7 +2,7 @@
 
 `gpudog` and `gpudogd` talk over a `SOCK_STREAM` Unix domain socket using a
 small binary protocol. The current version is **6**. The definitions are in
-`crates/gpudog-lib/src/protocol/mod.rs`.
+`crates/gpudog-core/src/protocol/mod.rs`.
 
 This page is for people writing another client or changing the protocol.
 Version 6 deliberately rejects older peers. Historical v3 to v5 fixtures

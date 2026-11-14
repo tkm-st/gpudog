@@ -16,7 +16,7 @@
 
 use std::collections::BTreeMap;
 
-use gpudog_lib::config::DaemonConfig;
+use gpudog_daemon::config::DaemonConfig;
 
 /// Cases where the loader deliberately differs from the recorded result,
 /// with the reason. Each is also asserted to still differ, so this list

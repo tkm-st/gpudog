@@ -7,9 +7,9 @@
 
 use nvml_wrapper::Nvml;
 
-use crate::device_visibility::VisibleDevices;
-use crate::nvml::{load_nvml, NvmlError};
-use crate::protocol::{is_valid_gpu_uuid, same_uuid, sanitize_display_text, MAX_GPU_COUNT};
+use gpudog_core::device_visibility::VisibleDevices;
+use gpudog_core::nvml::{load_nvml, NvmlError};
+use gpudog_core::protocol::{is_valid_gpu_uuid, same_uuid, sanitize_display_text, MAX_GPU_COUNT};
 
 /// One device, as the daemon reports it.
 #[derive(Debug, Clone, PartialEq, Eq)]

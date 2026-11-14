@@ -42,7 +42,7 @@ use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 use crate::gpu_inventory::GpuInventory;
-use crate::protocol::{DenyReason, GpuSelection};
+use gpudog_core::protocol::{DenyReason, GpuSelection};
 
 /// A position in the daemon's startup device list: the inventory's index.
 ///

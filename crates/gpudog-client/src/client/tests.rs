@@ -7,10 +7,10 @@ use std::time::Duration;
 
 use super::*;
 use crate::cli_options::{build_acquire, RunOptions};
-use crate::gpu_inventory::StaticInventory;
-use crate::protocol::{codec::FrameCodec, Denied, MAX_COMMAND_SIZE};
-use crate::scheduler::Scheduler;
-use crate::service::{discard_log, LogSink, Service, ServiceConfig};
+use gpudog_core::protocol::{codec::FrameCodec, Denied, MAX_COMMAND_SIZE};
+use gpudog_daemon::gpu_inventory::StaticInventory;
+use gpudog_daemon::scheduler::Scheduler;
+use gpudog_daemon::service::{discard_log, LogSink, Service, ServiceConfig};
 
 fn scratch_socket() -> PathBuf {
     static COUNTER: AtomicU32 = AtomicU32::new(0);
@@ -465,7 +465,7 @@ async fn an_out_of_view_grant_closes_the_connection_even_if_client_is_retained()
         let (stream, _) = listener.accept().await.unwrap();
         let mut line = Framed::new(stream, FrameCodec);
         assert!(matches!(line.next().await, Some(Ok(Message::Hello(_)))));
-        line.send(Message::HelloAck(crate::protocol::HelloAck::default()))
+        line.send(Message::HelloAck(gpudog_core::protocol::HelloAck::default()))
             .await
             .unwrap();
         assert!(matches!(line.next().await, Some(Ok(Message::Acquire(_)))));
@@ -499,9 +499,11 @@ async fn a_mismatched_hello_ack_is_not_accepted() {
         let (stream, _) = listener.accept().await.unwrap();
         let mut line = Framed::new(stream, FrameCodec);
         let _ = line.next().await;
-        line.send(Message::HelloAck(crate::protocol::HelloAck { version: 3 }))
-            .await
-            .unwrap();
+        line.send(Message::HelloAck(gpudog_core::protocol::HelloAck {
+            version: 3,
+        }))
+        .await
+        .unwrap();
     });
     assert!(matches!(
         Client::connect(&path).await,
@@ -534,7 +536,7 @@ async fn malformed_grant_frames_release_a_retained_client_connection() {
         raw_grant(&[], &[]),
         raw_grant(&[0, 1], &["GPU-static-0", "GPU-static-0"]),
         raw_grant(&[0, 1], &["GPU-static-0"]),
-        crate::protocol::encode(&Message::Pong).unwrap(),
+        gpudog_core::protocol::encode(&Message::Pong).unwrap(),
     ];
     for raw in cases {
         let path = scratch_socket();
@@ -543,7 +545,7 @@ async fn malformed_grant_frames_release_a_retained_client_connection() {
             let (stream, _) = listener.accept().await.unwrap();
             let mut line = Framed::new(stream, FrameCodec);
             let _ = line.next().await;
-            line.send(Message::HelloAck(crate::protocol::HelloAck::default()))
+            line.send(Message::HelloAck(gpudog_core::protocol::HelloAck::default()))
                 .await
                 .unwrap();
             assert!(matches!(line.next().await, Some(Ok(Message::Acquire(_)))));
@@ -583,7 +585,7 @@ where
     Fut: std::future::Future<Output = ()>,
 {
     assert!(matches!(line.next().await, Some(Ok(Message::Hello(_)))));
-    line.send(Message::HelloAck(crate::protocol::HelloAck::default()))
+    line.send(Message::HelloAck(gpudog_core::protocol::HelloAck::default()))
         .await
         .unwrap();
     rest(line).await;
@@ -818,9 +820,11 @@ async fn an_unanswered_acquire_is_unresponsive_but_waiting_in_the_queue_is_not()
     let peer = silent_daemon(&path, |line| {
         hello_then(line, |mut line| async move {
             assert!(matches!(line.next().await, Some(Ok(Message::Acquire(_)))));
-            line.send(Message::Queued(crate::protocol::Queued { position: 0 }))
-                .await
-                .unwrap();
+            line.send(Message::Queued(gpudog_core::protocol::Queued {
+                position: 0,
+            }))
+            .await
+            .unwrap();
             tokio::time::sleep(SHORT * 4).await;
             line.send(Message::Granted(Granted {
                 gpus: vec![0],

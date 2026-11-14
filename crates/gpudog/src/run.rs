@@ -5,10 +5,10 @@ use std::os::unix::process::ExitStatusExt;
 use std::path::Path;
 use std::process::ExitCode;
 
-use gpudog_lib::cli_options::{build_acquire, RunOptions};
-use gpudog_lib::client::ClientError;
-use gpudog_lib::cuda_visible_devices;
-use gpudog_lib::device_visibility::VisibleDevices;
+use gpudog_client::cli_options::{build_acquire, RunOptions};
+use gpudog_client::client::ClientError;
+use gpudog_client::cuda_visible_devices;
+use gpudog_core::device_visibility::VisibleDevices;
 use nix::sys::signal::{kill, Signal};
 use nix::unistd::Pid;
 use tokio::signal::unix::{signal, SignalKind};

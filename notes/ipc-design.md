@@ -71,7 +71,7 @@ only the wrapper does not release GPUs still used by its child.
 Integers are little-endian. Bodies are capped at 64 KiB before allocation;
 string/list bounds and field relationships are validated by the codec.
 The ten message types and exact fields are in
-`crates/gpudog-lib/src/protocol/mod.rs` and `docs/developer/protocol.md`.
+`crates/gpudog-core/src/protocol/mod.rs` and `docs/developer/protocol.md`.
 Existing layout or enum-value changes require a protocol version bump.
 Unknown deny reasons can still carry a readable detail.
 

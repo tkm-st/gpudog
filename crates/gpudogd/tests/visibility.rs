@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
-use gpudog_lib::client::Client;
+use gpudog_client::client::Client;
 use tokio::process::Command;
 
 #[path = "../../gpudog/tests/support/mod.rs"]

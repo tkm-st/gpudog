@@ -16,9 +16,9 @@ use nix::fcntl::{fcntl, FcntlArg, FdFlag};
 use tokio::net::UnixStream;
 use tokio_util::codec::Framed;
 
-use crate::device_visibility::{VisibilityError, VisibleDevices};
-use crate::protocol::codec::{CodecError, FrameCodec};
-use crate::protocol::{
+use gpudog_core::device_visibility::{VisibilityError, VisibleDevices};
+use gpudog_core::protocol::codec::{CodecError, FrameCodec};
+use gpudog_core::protocol::{
     sanitize_display_text, Acquire, DenyReason, Granted, Hello, Message, StatusReply,
     PROTOCOL_VERSION,
 };

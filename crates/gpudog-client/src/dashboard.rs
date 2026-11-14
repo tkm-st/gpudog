@@ -8,7 +8,7 @@
 
 use std::fmt::Write;
 
-use crate::protocol::{
+use gpudog_core::protocol::{
     sanitize_display_text, GpuProcessInfo, ProcessOwnership as Ownership, ReservationInfo,
     StatusReply,
 };
@@ -297,7 +297,7 @@ mod tests {
     //! The main property: nothing reaches the terminal unsanitised.
 
     use super::*;
-    use crate::protocol::DeviceInfo;
+    use gpudog_core::protocol::DeviceInfo;
 
     #[test]
     fn observed_and_reserved_devices_are_not_double_counted() {

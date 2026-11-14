@@ -11,7 +11,8 @@ publish.workspace = true
 description = "GPUDog client: run a process while holding an exclusive GPU reservation"
 
 [dependencies]
-gpudog-lib.workspace = true
+gpudog-core.workspace = true
+gpudog-client.workspace = true
 clap.workspace = true
 nix.workspace = true
 signal-hook.workspace = true
@@ -21,4 +22,5 @@ tokio.workspace = true
 workspace = true
 
 [dev-dependencies]
+gpudog-daemon.workspace = true
 tokio = { workspace = true, features = ["process"] }

@@ -41,8 +41,9 @@ Cargo.toml              workspace dependencies, lints and release profile
 Cargo.lock              locked dependency graph; keep tracked
 CHANGELOG.md            changes per release; its sections become release notes
 rust-toolchain.toml     stable channel, rustfmt and Clippy
-crates/gpudog-lib/      protocol, scheduler, service, client, config, NVML,
-                        GPU processes, logging and dashboard
+crates/gpudog-core/     protocol, NVML loading and CUDA device visibility
+crates/gpudog-client/   client sessions, `gpudog run` options and dashboard
+crates/gpudog-daemon/   scheduler, service, config, logging and GPU observation
 crates/gpudog/          client binary and CLI integration tests
 crates/gpudogd/         daemon binary, integration tests, cargo-deb metadata
 packaging/              systemd unit, config.toml template, Debian scripts
@@ -297,26 +298,28 @@ the gates where it says `verifier`, with any directory under `tmp/` as
 
 ### Module map
 
-| Module (`crates/gpudog-lib/src/`) | Responsibility |
-| -- | -- |
-| `protocol/` (`mod`, `codec`, `tests`) | Wire format v6 and framing |
-| `nvml` | Runtime NVML loading, shared by client and daemon |
-| `peer_credentials` | `SO_PEERCRED` identity via `nix` |
-| `gpu_inventory` | Daemon's NVML device inventory, plus a static test double |
-| `device_visibility` | Context-free CUDA ordinal/UUID discovery and grant validation |
-| `scheduler` | Load-ordered queue and the reservation lifecycle |
-| `service` | tokio listener and per-session state machine |
-| `client` | Client side of the protocol, `into_reservation` |
-| `cli_options`, `config` | Argument parsing, `config.toml` loading |
-| `daemon_log` | Non-blocking stderr/journal logging |
-| `dashboard` | Terminal rendering of the daemon's snapshot for `gpudog dash` |
-| `gpu_processes` | Daemon's managed-UUID NVML queries and host procfs facts |
-| `process_watcher` | PID/start-time descendant cache; usage and labels are separate |
+| Crate | Module | Responsibility |
+| -- | -- | -- |
+| `gpudog-core` | `protocol/` (`mod`, `codec`, `tests`) | Wire format v6 and framing |
+| `gpudog-core` | `nvml` | Runtime NVML loading, shared by client and daemon |
+| `gpudog-core` | `device_visibility` | Context-free CUDA ordinal/UUID discovery and grant validation |
+| `gpudog-client` | `client` | Client side of the protocol, `into_reservation` |
+| `gpudog-client` | `cli_options` | `gpudog run` argument parsing |
+| `gpudog-client` | `cuda_visible_devices` | UUID lists in `CUDA_VISIBLE_DEVICES` |
+| `gpudog-client` | `dashboard` | Terminal rendering of the daemon's snapshot for `gpudog dash` |
+| `gpudog-daemon` | `peer_credentials` | `SO_PEERCRED` identity via `nix` |
+| `gpudog-daemon` | `gpu_inventory` | Daemon's NVML device inventory, plus a static test double |
+| `gpudog-daemon` | `scheduler` | Load-ordered queue and the reservation lifecycle |
+| `gpudog-daemon` | `service` | tokio listener and per-session state machine |
+| `gpudog-daemon` | `config` | `config.toml` loading |
+| `gpudog-daemon` | `daemon_log` | Non-blocking stderr/journal logging |
+| `gpudog-daemon` | `gpu_processes` | Managed-UUID NVML queries and host procfs facts |
+| `gpudog-daemon` | `process_watcher` | PID/start-time descendant cache; usage and labels are separate |
 
-`lib.rs` groups the modules as shared (`protocol`, `nvml`,
-`device_visibility`), client and daemon; client and daemon modules never
-use each other. Binaries: `crates/gpudog` (client) and `crates/gpudogd`
-(daemon, owns the cargo-deb metadata). Packaging steps verify with
+`gpudog-client` and `gpudog-daemon` depend on `gpudog-core` and never on
+each other, except as dev-dependencies for tests that run a real client
+against an in-process daemon. Binaries: `crates/gpudog` (client) and
+`crates/gpudogd` (daemon, owns the cargo-deb metadata). Packaging steps verify with
 `cargo deb -p gpudogd --no-build` after a release build. Plan bottom-up: `protocol`, `cli_options`, `config` and
 the `scheduler` core are testable without a daemon, GPU or sockets.
 
@@ -346,8 +349,9 @@ contributor describes them in the pull request instead.
 ## Tests and compatibility
 
 Unit tests live in modules and `<module>/tests.rs`; integration tests are in
-`crates/*/tests/`. Protocol and config fixtures in
-`crates/gpudog-lib/tests/golden/` preserve the compatibility contract:
+`crates/*/tests/`. Protocol fixtures in
+`crates/gpudog-core/tests/golden/` and config fixtures in
+`crates/gpudog-daemon/tests/golden/` preserve the compatibility contract:
 `config_recorded_results.txt` is a frozen record, never regenerated (see
 `docs/developer/building.md`). `scripts/gen-golden-v6.py` is the current
 fixture encoder, independent of the Rust codec. The v3 to v5 fixtures

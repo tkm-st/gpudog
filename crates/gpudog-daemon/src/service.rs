@@ -36,14 +36,14 @@ use crate::gpu_inventory::{GpuDevice, GpuInventory};
 use crate::gpu_processes::{GpuProcessSource, ManagedNvmlSource, ProcFs, ProcessIdentity, Seeds};
 use crate::peer_credentials::{credentials_of, PeerCredentials};
 use crate::process_watcher::{ObservedProcess, ProcessTracker, ReservationRoot};
-use crate::protocol::codec::{CodecError, FrameCodec};
-use crate::protocol::{
-    self, sanitize_display_text, Acquire, Denied, DenyReason, DeviceInfo, GpuSelection, Granted,
-    HelloAck, Message, ProtocolError, Queued, ReservationInfo, StatusReply, PROTOCOL_VERSION,
-};
 use crate::scheduler::{
     BusyOwners, RequestId, ReservationOutcome, ReservationRequest, ReservationSnapshot, Scheduler,
     SchedulerLimits, Slot, SlotState,
+};
+use gpudog_core::protocol::codec::{CodecError, FrameCodec};
+use gpudog_core::protocol::{
+    self, sanitize_display_text, Acquire, Denied, DenyReason, DeviceInfo, GpuSelection, Granted,
+    HelloAck, Message, ProtocolError, Queued, ReservationInfo, StatusReply, PROTOCOL_VERSION,
 };
 
 pub const DEFAULT_SOCKET_MODE: u32 = 0o666;

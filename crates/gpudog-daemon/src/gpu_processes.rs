@@ -17,7 +17,7 @@ use nvml_wrapper::error::NvmlError as RawNvmlError;
 use nvml_wrapper::struct_wrappers::device::ProcessInfo;
 use nvml_wrapper::Nvml;
 
-use crate::nvml::{load_nvml, NvmlError};
+use gpudog_core::nvml::{load_nvml, NvmlError};
 
 /// One process holding a context on one GPU, as NVML reports it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -103,11 +103,9 @@ impl NvmlProcessSource {
             let uuid = device
                 .uuid()
                 .map_err(|e| NvmlError(format!("nvmlDeviceGetUUID failed for {what}: {e}")))?;
-            if self
-                .selected
-                .as_ref()
-                .is_some_and(|uuids| !crate::protocol::same_uuid(&uuids[index as usize], &uuid))
-            {
+            if self.selected.as_ref().is_some_and(|uuids| {
+                !gpudog_core::protocol::same_uuid(&uuids[index as usize], &uuid)
+            }) {
                 return Err(NvmlError(
                     "NVML observer UUID differs from the managed CUDA view".into(),
                 ));
@@ -489,14 +487,14 @@ pub struct Collected {
 }
 
 /// How a GPU process relates to the daemon's reservations.
-pub use crate::protocol::ProcessOwnership as Ownership;
+pub use gpudog_core::protocol::ProcessOwnership as Ownership;
 
 /// One observed GPU process, as the daemon keeps it between observations.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProcessRow {
     /// The scheduler slot of its GPU; the service translates it to a daemon
-    /// GPU number when it builds a snapshot. `None` for a GPU it does not
-    /// manage.
+    /// GPU number when it builds a snapshot. The process watcher always sets
+    /// it; the service drops a row without one.
     pub gpu: Option<u32>,
     pub pid: u32,
     pub uid: Option<u32>,

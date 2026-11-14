@@ -242,19 +242,45 @@ name = "gpudog"
 version = "0.0.1"
 dependencies = [
  "clap",
- "gpudog-lib",
+ "gpudog-client",
+ "gpudog-core",
+ "gpudog-daemon",
  "nix",
  "signal-hook",
  "tokio",
 ]
 
 [[package]]
-name = "gpudog-lib"
+name = "gpudog-client"
+version = "0.0.1"
+dependencies = [
+ "futures-util",
+ "gpudog-core",
+ "gpudog-daemon",
+ "nix",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
+name = "gpudog-core"
 version = "0.0.1"
 dependencies = [
  "bytes",
  "cudarc",
+ "nvml-wrapper",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
+name = "gpudog-daemon"
+version = "0.0.1"
+dependencies = [
  "futures-util",
+ "gpudog-core",
  "nix",
  "nvml-wrapper",
  "serde",
@@ -270,7 +296,9 @@ version = "0.0.1"
 dependencies = [
  "clap",
  "futures-util",
- "gpudog-lib",
+ "gpudog-client",
+ "gpudog-core",
+ "gpudog-daemon",
  "nix",
  "tokio",
  "tokio-util",

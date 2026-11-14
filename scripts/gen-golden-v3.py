@@ -2,7 +2,7 @@
 """Generate protocol-v3 fixtures independently of the implementation.
 
 Usage: python3 scripts/gen-golden-v3.py <existing-output-directory>
-The canonical fixtures are in crates/gpudog-lib/tests/golden/.
+The canonical fixtures are in crates/gpudog-core/tests/golden/.
 """
 import struct
 import sys

@@ -1,6 +1,12 @@
 [workspace]
 resolver = "2"
-members = ["crates/gpudog-lib", "crates/gpudog", "crates/gpudogd"]
+members = [
+    "crates/gpudog-core",
+    "crates/gpudog-client",
+    "crates/gpudog-daemon",
+    "crates/gpudog",
+    "crates/gpudogd",
+]
 
 [workspace.package]
 version = "0.0.1"
@@ -14,7 +20,9 @@ homepage = "https://tkm-st.github.io/gpudog/"
 publish = false
 
 [workspace.dependencies]
-gpudog-lib = { path = "crates/gpudog-lib" }
+gpudog-core = { path = "crates/gpudog-core" }
+gpudog-client = { path = "crates/gpudog-client" }
+gpudog-daemon = { path = "crates/gpudog-daemon" }
 anyhow = "1"
 bytes = "1"
 futures-util = { version = "0.3", features = ["sink"] }

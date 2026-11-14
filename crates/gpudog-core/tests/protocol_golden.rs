@@ -1,7 +1,7 @@
 //! Protocol-v6 compatibility against the independent Python encoder.
 //! Historical v3-v5 files are retained; older peers fail the handshake.
 
-use gpudog_lib::protocol::*;
+use gpudog_core::protocol::*;
 
 fn parse_hex(hex: &str) -> Vec<u8> {
     (0..hex.len())

@@ -6,10 +6,10 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use gpudog_lib::gpu_inventory::StaticInventory;
+use gpudog_daemon::gpu_inventory::StaticInventory;
 mod support;
-use gpudog_lib::scheduler::Scheduler;
-use gpudog_lib::service::{discard_log, Service, ServiceConfig};
+use gpudog_daemon::scheduler::Scheduler;
+use gpudog_daemon::service::{discard_log, Service, ServiceConfig};
 use nix::sys::signal::{kill, Signal};
 use nix::unistd::Pid;
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -38,7 +38,7 @@ fn start(gpus: u32) -> Service {
     Service::start(
         Arc::new(StaticInventory::new(
             (0..gpus)
-                .map(|index| gpudog_lib::gpu_inventory::GpuDevice {
+                .map(|index| gpudog_daemon::gpu_inventory::GpuDevice {
                     index,
                     nvml_index: index,
                     uuid: support::uuid(index),

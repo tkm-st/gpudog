@@ -1,0 +1,25 @@
+[package]
+name = "gpudog-client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish.workspace = true
+description = "GPUDog client library: sessions, gpudog run options and the dashboard"
+
+[dependencies]
+gpudog-core.workspace = true
+futures-util.workspace = true
+nix.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+
+[dev-dependencies]
+gpudog-daemon.workspace = true
+
+[lints]
+workspace = true

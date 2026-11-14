@@ -9,8 +9,8 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{Duration, Instant};
 
 use futures_util::{SinkExt, StreamExt};
-use gpudog_lib::protocol::codec::FrameCodec;
-use gpudog_lib::protocol::{Acquire, Granted, Hello, HelloAck, Message};
+use gpudog_core::protocol::codec::FrameCodec;
+use gpudog_core::protocol::{Acquire, Granted, Hello, HelloAck, Message};
 use nix::sys::signal::{kill, Signal};
 use nix::unistd::Pid;
 use tokio_util::codec::Framed;
@@ -302,10 +302,10 @@ fn obsolete_log_directory_settings_warn_but_start() {
 #[test]
 fn a_missing_default_config_file_warns_but_starts() {
     // Only meaningful where nothing is installed at the default path.
-    if Path::new(gpudog_lib::config::DEFAULT_CONFIG_PATH).exists() {
+    if Path::new(gpudog_daemon::config::DEFAULT_CONFIG_PATH).exists() {
         eprintln!(
             "skipped: {} exists",
-            gpudog_lib::config::DEFAULT_CONFIG_PATH
+            gpudog_daemon::config::DEFAULT_CONFIG_PATH
         );
         return;
     }
@@ -327,7 +327,7 @@ fn a_missing_default_config_file_warns_but_starts() {
     assert!(
         stderr.contains(&format!(
             "gpudogd: warning: no configuration file at {}; using the defaults",
-            gpudog_lib::config::DEFAULT_CONFIG_PATH
+            gpudog_daemon::config::DEFAULT_CONFIG_PATH
         )),
         "{stderr}"
     );
@@ -379,7 +379,7 @@ fn command_line_flags_override_the_config_file() {
         .unwrap();
     let mut reply = Vec::new();
     second.read_to_end(&mut reply).unwrap();
-    let Message::Denied(denied) = gpudog_lib::protocol::decode_frame(&reply).unwrap() else {
+    let Message::Denied(denied) = gpudog_core::protocol::decode_frame(&reply).unwrap() else {
         panic!("expected a denial");
     };
     assert_eq!(denied.detail, b"connection limit reached");

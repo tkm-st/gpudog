@@ -3,20 +3,24 @@
 ## Repository layout
 
 ```text
-crates/gpudog-lib/  protocol, scheduler, service, client, config, NVML, dashboard
-crates/gpudog/      client binary and CLI integration tests
-crates/gpudogd/     daemon binary and daemon integration tests
-packaging/          Debian metadata support and systemd unit
-docs/               this documentation
-notes/              design notes for maintainers
+crates/gpudog-core/    protocol, NVML loading and CUDA device visibility
+crates/gpudog-client/  client sessions, gpudog run options and dashboard
+crates/gpudog-daemon/  scheduler, service, config, logging and GPU observation
+crates/gpudog/         client binary and CLI integration tests
+crates/gpudogd/        daemon binary and daemon integration tests
+packaging/             Debian metadata support and systemd unit
+docs/                  this documentation
+notes/                 design notes for maintainers
 ```
 
 ## Modules
 
-The library's modules fall into three groups. The shared ones (`protocol`,
-`nvml`, `device_visibility`) depend on no other group. Client modules
-(`client`, `cli_options`, `cuda_visible_devices`, `dashboard`) and daemon
-modules (the rest) never use each other.
+The modules live in three library crates. `gpudog-core` (`protocol`,
+`nvml`, `device_visibility`) depends on neither of the others.
+`gpudog-client` (`client`, `cli_options`, `cuda_visible_devices`,
+`dashboard`) and `gpudog-daemon` (the rest) depend on `gpudog-core` and
+never on each other; only tests that run a real client against an
+in-process daemon use both.
 
 | Module | Responsibility |
 | -- | -- |
@@ -121,7 +125,7 @@ What remains from earlier versions:
 
 *   Protocol versions 2 to 5 are listed under
     [Compatibility rules](protocol.md#compatibility-rules). The v3 to v5
-    golden fixtures in `crates/gpudog-lib/tests/golden/` and their
+    golden fixtures in `crates/gpudog-core/tests/golden/` and their
     generators (`scripts/gen-golden-v3.py` to `gen-golden-v5.py`) are kept.
     The fixtures document earlier wire layouts and are not tested; the
     generators are kept because `gen-golden-v6.py` builds on them. Only
@@ -129,7 +133,7 @@ What remains from earlier versions:
 *   Earlier daemons wrote log files. The `log_directory` key and
     `--log-directory` option are accepted with a warning and ignored (see
     [Logging](../administration/logging.md)).
-*   `crates/gpudog-lib/tests/config_compat.rs` checks that existing config
+*   `crates/gpudog-daemon/tests/config_compat.rs` checks that existing config
     files still load as they did: the loader must give the results in
     `config_recorded_results.txt`, a frozen record that is never
     regenerated, apart from the deliberate differences it lists in

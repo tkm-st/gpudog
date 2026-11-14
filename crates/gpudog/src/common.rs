@@ -4,7 +4,7 @@ use std::io::Write;
 use std::path::Path;
 use std::process::ExitCode;
 
-use gpudog_lib::client::{Client, ClientError};
+use gpudog_client::client::{Client, ClientError};
 
 /// Writes one `gpudog:` line to stderr. Unlike `eprintln!`, a failed write
 /// is ignored rather than a panic: after a terminal hangup, stderr may be
