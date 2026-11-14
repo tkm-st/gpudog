@@ -43,13 +43,13 @@ class ThirdPartyLicensesTests(unittest.TestCase):
         self.nodes.append({"id": name, "deps": [{"pkg": dep, "dep_kinds": kinds} for dep, kinds in deps]})
 
     def metadata(self):
-        return {"packages": self.packages, "workspace_members": ["gpudog", "gpudogd", "gpudog-lib"],
+        return {"packages": self.packages, "workspace_members": ["gpudog", "gpudogd", "gpudog-core"],
                 "resolve": {"nodes": self.nodes}}
 
     def graph(self):
-        self.crate("gpudog", [("gpudog-lib", NORMAL), ("tester", DEV)])
-        self.crate("gpudogd", [("gpudog-lib", NORMAL), ("builder", BUILD)])
-        self.crate("gpudog-lib", [("zeta", NORMAL), ("alpha", NORMAL + DEV)])
+        self.crate("gpudog", [("gpudog-core", NORMAL), ("tester", DEV)])
+        self.crate("gpudogd", [("gpudog-core", NORMAL), ("builder", BUILD)])
+        self.crate("gpudog-core", [("zeta", NORMAL), ("alpha", NORMAL + DEV)])
         self.crate("zeta", [("alpha", NORMAL)], license="MIT/Apache-2.0", files=("LICENSE-MIT", "LICENSE-APACHE"))
         self.crate("alpha", license="(MIT OR Apache-2.0) AND Unicode-3.0", files=("COPYING", "NOTICE"))
         self.crate("tester")
