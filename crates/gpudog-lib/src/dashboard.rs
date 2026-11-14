@@ -337,6 +337,40 @@ mod tests {
         assert!(render(&truncated, &no_processes(), 1).contains("unknown free"));
     }
 
+    #[test]
+    fn the_process_view_follows_the_daemon_observation() {
+        let bypassed = StatusReply::default();
+        assert_eq!(
+            daemon_view(&bypassed),
+            ProcessView::Unavailable("NVML observation bypassed (test inventory)".into())
+        );
+        let waiting = StatusReply {
+            observing: true,
+            ..StatusReply::default()
+        };
+        assert_eq!(
+            daemon_view(&waiting),
+            ProcessView::Unavailable("waiting for the first GPU observation".into())
+        );
+        let failed = StatusReply {
+            observation_error: b"no NVML\x1b[2J".to_vec(),
+            ..waiting.clone()
+        };
+        assert_eq!(
+            daemon_view(&failed),
+            ProcessView::Unavailable("no NVML?[2J".into())
+        );
+        let observed = StatusReply {
+            observation_age_ms: Some(10),
+            processes: vec![process(0, 7, Ownership::Managed)],
+            ..waiting
+        };
+        assert_eq!(
+            daemon_view(&observed),
+            ProcessView::Rows(vec![process(0, 7, Ownership::Managed)])
+        );
+    }
+
     fn no_processes() -> ProcessView {
         ProcessView::Rows(Vec::new())
     }

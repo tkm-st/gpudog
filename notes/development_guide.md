@@ -92,8 +92,9 @@ See `notes/device-identity.md` for the exact current behaviour.
 *   The daemon queries NVML and walks `/proc` (`gpu_processes`,
     `process_watcher`); `dash` only renders the daemon's snapshot.
     Classification is best-effort, not authorization or scheduling input.
-    Double-fork, unreadable procfs and truncated holder snapshots limit it;
-    the current UID match is not a complete PID-reuse defense.
+    Double-fork outside a known parent, unreadable procfs and the
+    descendant and ancestor budgets (`MAX_DESCENDANTS`, `MAX_ANCESTORS`)
+    limit it.
 
 ## Why
 

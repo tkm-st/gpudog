@@ -1,4 +1,5 @@
-//! Every process using a GPU, and whether a reservation accounts for it.
+//! GPU processes on the managed UUIDs, and the host procfs facts used to
+//! label them.
 //!
 //! Production queries run in the daemon for its managed UUIDs, with bounded
 //! host procfs facts and PID/start-time tracking in `process_watcher`.
