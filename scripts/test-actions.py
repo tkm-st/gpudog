@@ -255,6 +255,18 @@ class PagesTests(unittest.TestCase):
         self.assertEqual(pages['environment']['name'], 'github-pages')
         self.assertIn(f"steps.{step['id']}.outputs.page_url", pages['environment']['url'])
         self.assertEqual(pages['concurrency'], {'group': 'pages', 'cancel-in-progress': False})
+        # A failure must fail the run, not be hidden after the release is out.
+        self.assertNotIn('continue-on-error', pages)
+        self.assertNotIn('continue-on-error', step)
+
+    def test_upload_and_deploy_use_the_same_artifact(self):
+        upload = next(step for step in self.JOBS['docs']['steps']
+                      if step.get('uses', '').startswith('actions/upload-pages-artifact@'))
+        deploy = self.JOBS['pages']['steps'][0]
+        # Both default to `github-pages`; a name on only one side would break
+        # the first stable deploy, after the release is already public.
+        self.assertEqual(upload['with'].get('name', 'github-pages'),
+                         deploy.get('with', {}).get('artifact_name', 'github-pages'))
 
     def test_the_build_job_has_read_only_access(self):
         docs = self.JOBS['docs']

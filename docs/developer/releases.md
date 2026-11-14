@@ -94,23 +94,27 @@ for example, version `0.0.1` requires `v0.0.1`. A SemVer prerelease such as
 `0.0.1-rc.1` is published as a prerelease; build metadata alone does not
 make a version a prerelease.
 
-Before publishing:
+Before publishing (steps 1 to 3 are needed once per repository):
 
 1.  Enable GitHub Actions and allow the pinned official checkout, cache,
     Node.js setup, artifact upload and artifact download Actions, plus
     `actions/upload-pages-artifact`, `actions/deploy-pages` and the
-    `actions/upload-artifact` version that `upload-pages-artifact` calls
-    (v7.0.0 for v5.0.0).
+    `actions/upload-artifact` version that `upload-pages-artifact` calls:
+    the workflow pins `upload-pages-artifact` v5.0.0, which calls
+    `upload-artifact` v7.0.0. Check this again whenever that pin changes.
 2.  Protect release tags with a repository ruleset so only release maintainers
     can create or modify them. Restrict changes to `.github/workflows/` through
     your normal review policy. A person who can push release tags can trigger
     publication of that commit; the workflow does not require `main` ancestry.
 3.  Set up GitHub Pages for the documentation site. Pages needs a public
     repository (a private one needs a paid plan, and its site is still
-    public). In **Settings > Pages**, set the source to **GitHub Actions**.
-    In **Settings > Environments > github-pages**, add the tag pattern `v*`
-    under **Selected branches and tags**: by default the environment
-    accepts only the default branch and refuses a tag's deploy.
+    public). First, in **Settings > Pages**, set the source to **GitHub
+    Actions**; this creates the `github-pages` environment, which by default
+    accepts deploys from the default branch only and so refuses a tag's.
+    Then, in **Settings > Environments > github-pages**, under **Selected
+    branches and tags**, add a rule with ref type **Tag** and pattern `v*`.
+    The default-branch rule can stay. The rule also admits prerelease tags;
+    the workflow itself skips their deploy.
 4.  Update the workspace version in `Cargo.toml`, run `cargo update -w` so
     `Cargo.lock` follows (the documented builds use `--locked`), and commit
     both.
@@ -197,23 +201,32 @@ the same workflow. A read-only job builds it from the tagged commit, with
 the same Zensical version as CI, and uploads it as a Pages artifact. After
 the release is published, a separate job deploys that artifact. Only this
 job gets the `pages` and `id-token` write permissions that a Pages deploy
-needs, and it runs no repository source. Prereleases build and upload the site but never deploy
-it, so the first stable tag is the first real test of the Pages settings
-from step 3. Every stable tag replaces the whole site, in the order the
-tags reach the deploy job: a tag on an older release line puts that
-line's documentation back.
+needs, and it runs no repository source. For a prerelease the site is built
+and uploaded, and the deploy job shows as skipped. The first stable tag is
+therefore the first real test of the Pages settings from step 3.
+
+Every stable tag replaces the whole site, and the site always shows the
+last stable tag deployed: a tag on an older release line puts that line's
+documentation back. Deploys run one at a time; if several stable tags are
+pushed in quick succession, a newer deploy waiting for its turn replaces an
+older one that is still waiting. Between releases, `docs/` on `main` may
+be newer than the site.
 
 The deploy runs after the release is public, so a deploy failure leaves
 the release published without updated documentation. Fix the cause (usually
-the Pages settings), then use **Re-run failed jobs**, never **Re-run all
-jobs**: the publication job refuses an already published release, and the
-deploy is skipped after it. The site artifact is kept for seven days; after
-that, the documentation is updated by the next stable release.
+the Pages settings). Then, on the workflow run's page under **Actions**,
+choose **Re-run jobs > Re-run failed jobs**, which runs the deploy again
+with the same site artifact. Do not choose **Re-run all jobs**: it would run
+the publication job again, which refuses the published release, so the
+deploy would be skipped. The site artifact is kept for seven days. After
+that, a published release has no way to redeploy its site; the next stable
+release updates it.
 
-If an upload fails, the release stays a draft. Rerunning the workflow can
-replace draft attachments and complete publication, but an already published
-release is never overwritten. Download artifacts before their seven-day
-retention expires; after that, rerun all jobs to rebuild and revalidate them.
+If an upload of release files fails, the release stays a draft. While it
+is a draft, rerunning the workflow can replace its attachments and complete
+publication; an already published release is never overwritten. The
+release artifacts are also kept for seven days; after that, rerun all jobs
+of a draft's run to rebuild and revalidate them.
 Checksums are rechecked on download but are not a cryptographic signature.
 
 `SHA256SUMS` covers the tar archive, the Debian package and the two

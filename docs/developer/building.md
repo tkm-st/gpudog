@@ -185,8 +185,9 @@ not just notifications, if unexpected spending must be prevented. This
 workflow does not use larger runners or increase the default cache allowance.
 
 See [Releases](releases.md#publishing-with-github-actions) for tag-driven
-publication. Container-registry publication, Pages deployment and server
-deployment are not configured.
+publication, including the documentation site's GitHub Pages deploy on
+stable tags. Container-registry publication and server deployment are not
+configured.
 
 Run the release guard tests locally with `uv run scripts/test-actions.py`.
 They execute the actual inline workflow scripts against temporary manifests

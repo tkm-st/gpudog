@@ -131,8 +131,9 @@ jobs:
     # Prereleases never replace the site.
     if: needs.version.outputs.prerelease == 'false'
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    # Deploys run one at a time, in the order their tags reach this job.
+    # Above deploy-pages' own 10-minute timeout, so it can cancel cleanly.
+    timeout-minutes: 15
+    # One deploy at a time; a newer waiting deploy replaces an older waiting one.
     concurrency:
       group: pages
       cancel-in-progress: false
