@@ -2,11 +2,13 @@
 """Check GPUDog's instructions and documentation against the code.
 
 *   Repository paths quoted in backticks in AGENTS.md must exist.
-*   Text that states the current protocol version (for example
-    `Protocol version is **6**` or `gpudogd 0.0.1 (protocol v6) starting`)
-    must name `PROTOCOL_VERSION` from the protocol module. Mentions of
-    earlier versions in other words, such as "since protocol v6", are
-    history and are not checked.
+*   A few exact phrases that state the current protocol version (see
+    CURRENT_VERSION, for example `Protocol version is **6**` or the sample
+    output `gpudogd 0.0.1 (protocol v6) starting`) must name
+    `PROTOCOL_VERSION` from the protocol module. These phrases always count
+    as current, even in historical text. Other mentions, current or not,
+    such as "the v6 codec" or "since protocol v6", are not checked: after a
+    protocol bump, grep for the old version as well.
 
 Private details (host names, personal paths) are not checked here: stop them
 before they are committed, with your own pre-commit hook.
