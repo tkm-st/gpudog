@@ -177,8 +177,10 @@ relies on a few cargo-deb behaviours that are easy to break.
     component only, 0755 restored only under a parent that passes
     `directory_complaint`). The operator still creates a missing parent, and
     the host directory behind a bind that does not create it (Compose long
-    syntax). Hardening options (`ProtectSystem=` and so on) are not added
-    yet; they need checking against NVML on a GPU host.
+    syntax). The unit sets `ProtectSystem=strict` (checked
+    2026-11-15 on WSL2 with an RTX A5000: start, NVML enumeration, socket,
+    reload; GPU process observation could not be checked there). Other
+    hardening options are not added yet.
 
 ### Development
 

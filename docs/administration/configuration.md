@@ -24,7 +24,7 @@
 | Key | Type | Default | Description |
 | -- | -- | -- | -- |
 | `log_directory` | string | unused | Obsolete key; warns and is ignored. Logs go to stderr/journal. |
-| `socket_path` | string | `"/run/gpudog/gpudogd.sock"` | Unix domain socket to listen on. |
+| `socket_path` | string | `"/run/gpudog/gpudogd.sock"` | Unix domain socket to listen on. Outside `/run/gpudog`, the packaged unit needs `ReadWritePaths=` for its directory; see [Without Docker](daemon.md#without-docker). |
 | `socket_mode` | string | `"0666"` | Permissions set on the socket, as an octal string. |
 | `require_secure_directory` | boolean | `true` | Refuse to start if the socket directory is writable by others. |
 | `max_connections` | integer (1–1,000,000) | `256` | Maximum client connections at once. |

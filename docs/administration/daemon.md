@@ -52,7 +52,17 @@ $ sudo gpudogd --socket /run/gpudog/gpudogd.sock
 ```
 
 The Debian package ships `gpudogd.service`, which creates `/run/gpudog`
-and starts the daemon. Read its logs with `journalctl -u gpudogd`.
+and starts the daemon. Read its logs with `journalctl -u gpudogd`. The unit
+sets `ProtectSystem=strict`, so the daemon can write only in `/run/gpudog`.
+For a `socket_path` in another directory, allow that directory in a
+drop-in, for example `/etc/systemd/system/gpudogd.service.d/socket.conf`:
+
+```ini
+[Service]
+ReadWritePaths=/srv/gpudog
+```
+
+Then run `sudo systemctl daemon-reload` and `sudo systemctl restart gpudogd`.
 
 ## Command-line options
 
