@@ -6,7 +6,7 @@ files and no log directory to configure.
 | Level | Contents |
 | -- | -- |
 | Access / info | Startup (the first line is `gpudogd <version> (protocol v<N>) starting`) and shutdown, loaded config, configuration reloads, GPUs, acquire, grant, denial and release, and notes on GPU process observation (a job with too many processes to follow, a kernel without child lists). |
-| Warning | Config warnings, a missing default config file, keys that need a restart after a reload, connection limits reached, rejected connections, version mismatches, handshake timeouts, a client whose process the daemon cannot read, a request for a GPU the daemon does not manage, and GPU processes without a readable owner. |
+| Warning | Config warnings, a missing default config file, a new socket directory left with the umask's mode, keys that need a restart after a reload, connection limits reached, rejected connections, version mismatches, handshake timeouts, a client whose process the daemon cannot read, a request for a GPU the daemon does not manage, and GPU processes without a readable owner. |
 | Error | Protocol violations, transport errors, startup failures, failed GPU observations (such as `cannot read procfs: ...`) and refused reloads ([Changing the configuration](configuration.md#changing-the-configuration)). |
 
 Untrusted text is sanitised and bounded, so one event stays on one log line.

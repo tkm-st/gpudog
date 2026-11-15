@@ -801,10 +801,17 @@ impl Service {
         scheduler.set_observed_usage(observing, &[]);
         let path = config.socket_path.clone();
         let directory = socket_directory(&path);
-        if create_socket_directory(directory).map_err(StartError)? {
+        let created = create_socket_directory(directory).map_err(StartError)?;
+        if created != Created::No {
             log(
                 LogLevel::Access,
                 &format!("created socket directory {}", directory.display()),
+            );
+        }
+        if let Created::ModeKept(reason) = created {
+            log(
+                LogLevel::Warning,
+                &format!("left the umask's mode on {}: {reason}", directory.display()),
             );
         }
         if config.require_secure_directory {
@@ -1267,16 +1274,16 @@ fn socket_directory(socket_path: &Path) -> &Path {
 
 /// Creates the socket directory, mode 0755, when it does not exist, so a
 /// fresh `/run` (a tmpfs, empty after boot) needs no manual step. Only the
-/// last component is created: a missing parent stays an error. Returns
-/// whether it created the directory; the caller still checks it.
-fn create_socket_directory(directory: &Path) -> Result<bool, String> {
+/// last component is created: a missing parent stays an error. The caller
+/// still checks the result.
+fn create_socket_directory(directory: &Path) -> Result<Created, String> {
     use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
     let shown = directory.display();
     let failed = |error: io::Error| format!("cannot create {shown}: {}", errno_text(&error));
     match std::fs::DirBuilder::new().mode(0o755).create(directory) {
         Ok(()) => {}
         // Whatever is there, a directory or not, is the check's business.
-        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => return Ok(false),
+        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => return Ok(Created::No),
         Err(error) => return Err(failed(error)),
     }
     // The umask may have removed bits clients need to reach the socket.
@@ -1289,8 +1296,8 @@ fn create_socket_directory(directory: &Path) -> Result<bool, String> {
         Some(parent) if !parent.as_os_str().is_empty() => parent,
         _ => Path::new("."),
     };
-    if directory_complaint(parent).is_some() {
-        return Ok(true);
+    if let Some(complaint) = directory_complaint(parent) {
+        return Ok(Created::ModeKept(complaint));
     }
     let flags = nix::fcntl::OFlag::O_DIRECTORY | nix::fcntl::OFlag::O_NOFOLLOW;
     let opened = std::fs::OpenOptions::new()
@@ -1304,7 +1311,19 @@ fn create_socket_directory(directory: &Path) -> Result<bool, String> {
             .set_permissions(std::fs::Permissions::from_mode(0o755))
             .map_err(failed)?;
     }
-    Ok(true)
+    Ok(Created::Yes)
+}
+
+/// What `create_socket_directory` did.
+#[derive(Debug, PartialEq)]
+enum Created {
+    /// Something already existed at the path.
+    No,
+    /// Created with mode 0755.
+    Yes,
+    /// Created, but left with the umask's mode because the parent fails
+    /// `directory_complaint` (the reason).
+    ModeKept(String),
 }
 
 /// Checks that `directory` is safe to hold the socket. Returns the reason it

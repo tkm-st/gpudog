@@ -10,16 +10,18 @@ devices and that shares its socket directory with the host. Build the
 `gpudogd` image first; see [Installation](installation.md#daemon-docker-image).
 
 ```shell-session
-$ docker run -d --name gpudogd --pid=host --userns=host --gpus all \
+$ docker run -d --name gpudogd --restart unless-stopped --pid=host --userns=host --gpus all \
     -v /run/gpudog:/run/gpudog \
     gpudogd
 ```
 
-If `/run/gpudog` is missing on the host, `-v` creates it; with other Docker
-setups, create it first with `sudo install -d -m 0755 /run/gpudog`. It must
-be owned by root and must not be writable by group or others (`0755`). The daemon
-refuses to start otherwise; see [Security model](administration/security.md)
-for the reason.
+`--restart unless-stopped` starts the daemon again after a reboot. A rootful
+Docker engine creates `/run/gpudog` on the host, owned by root with mode
+`0755`, whenever it is missing. With a rootless engine or user namespace remapping, create it before every
+start instead, for example with a `tmpfiles.d` entry, since `/run` is emptied
+at boot. The directory must be owned by
+root and must not be writable by group or others; the daemon refuses to
+start otherwise (see [Security model](administration/security.md)).
 
 On a machine without Docker, run the binary directly as root. It creates
 `/run/gpudog` itself when the directory is missing, for example after a

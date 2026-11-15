@@ -47,8 +47,10 @@ First release.
     warning or error that a client can cause repeatedly, such as going over its
     connection limit, is logged at most once every 10 seconds per user. A
     missing default configuration file is logged as a warning.
-*   A missing socket directory is created at startup (mode `0755`, the
-    last directory only) and logged as `created socket directory <path>`.
+*   A missing socket directory is created at startup with mode `0755`
+    (only the directory that holds the socket, not its parents) and logged
+    as `created socket directory <path>`. Under a parent that others can
+    write to, the umask decides the mode and a warning is logged.
 *   GPU process observation: a GPU observed in use is not granted until it
     is idle, whoever started the process, and failed observations pause new
     grants without stopping running jobs. The daemon reads from

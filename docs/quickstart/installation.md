@@ -11,16 +11,19 @@ it with access to every GPU and the socket directory shared with the host:
 ```shell-session
 $ git checkout v0.0.1      # the release your clients come from
 $ docker build -t gpudogd .
-$ docker run -d --name gpudogd --pid=host --userns=host --gpus all \
+$ docker run -d --name gpudogd --restart unless-stopped --pid=host --userns=host --gpus all \
     -v /run/gpudog:/run/gpudog \
     gpudogd
 ```
 
 !!! warning
-    `-v` creates `/run/gpudog` on the host if it is missing; it must be
-    owned by root with mode `0755`. The daemon refuses
-    to bind otherwise, because a socket directory that others can write to
-    would let any user hijack the connection.
+    A rootful Docker engine creates `/run/gpudog` on the host, owned by
+    root with mode `0755`, whenever it is missing. With a rootless engine
+    or user namespace remapping, create it before every start instead (for
+    example with a `tmpfiles.d` entry). The directory must be owned by
+    root and not writable by group or others. The daemon refuses to bind
+    otherwise, because a socket directory that others can write to would
+    let any user hijack the connection.
 
 The default Docker image contains only the daemon (a `client` image for jobs
 in containers is described in
