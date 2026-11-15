@@ -26,6 +26,35 @@ fn unmanaged_watch_interval_is_positive_bounded_and_defaults_to_one_second() {
 }
 
 /// Applies `text`, requiring success with at least one warning.
+#[test]
+fn the_hold_limit_defaults_to_none_and_is_bounded_by_the_wire() {
+    assert_eq!(loaded("").service.max_hold_ms, 0);
+    assert_eq!(
+        loaded("max_hold_ms = 7200000").service.max_hold_ms,
+        7_200_000
+    );
+    // 0 is no limit, not a refused value.
+    let none = loaded("max_hold_ms = 0");
+    assert_eq!(none.service.max_hold_ms, 0);
+    assert!(none.validate().is_ok());
+    assert_eq!(
+        loaded("max_hold_ms = 4294967295").service.max_hold_ms,
+        4_294_967_295
+    );
+    assert_eq!(
+        warnings("max_hold_ms = 4294967296"),
+        ["ignoring 'max_hold_ms': must be between 0 and 4294967295"]
+    );
+    assert_eq!(
+        warnings("max_hold_ms = -1"),
+        ["ignoring 'max_hold_ms': must be between 0 and 4294967295"]
+    );
+    assert_eq!(
+        warnings("max_hold_ms = \"2h\""),
+        ["ignoring 'max_hold_ms': expected an integer"]
+    );
+}
+
 fn warnings(text: &str) -> Vec<String> {
     let warnings = DaemonConfig::default()
         .apply_text(text, "<config>")
@@ -494,13 +523,14 @@ fn a_reload_reports_changed_limits_and_keys_that_need_a_restart() {
     assert!(old.restart_required_changes(&old).is_empty());
 
     let new = loaded(
-        "max_held_per_uid = 2\nhandshake_timeout_ms = 500\nsocket_mode = \"0600\"\nsocket_path = \"/run/other.sock\"\n",
+        "max_held_per_uid = 2\nmax_hold_ms = 60000\nhandshake_timeout_ms = 500\nsocket_mode = \"0600\"\nsocket_path = \"/run/other.sock\"\n",
     );
     assert_eq!(
         old.limit_changes(&new),
         [
             "handshake_timeout_ms 10000 -> 500",
-            "max_held_per_uid 8 -> 2"
+            "max_held_per_uid 8 -> 2",
+            "max_hold_ms 0 -> 60000"
         ]
     );
     assert_eq!(

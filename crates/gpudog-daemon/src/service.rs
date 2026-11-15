@@ -172,6 +172,10 @@ pub struct ServiceConfig {
     pub handshake_timeout: Duration,
     pub scheduler_limits: SchedulerLimits,
     pub watch_unmanaged_ms: u64,
+    /// Milliseconds a grant may be held, sent to the client in `Granted`;
+    /// 0 means no limit. The client stops its command when it ends. The
+    /// daemon only logs a reservation held longer: it never revokes one.
+    pub max_hold_ms: u64,
 }
 
 impl Default for ServiceConfig {
@@ -185,6 +189,7 @@ impl Default for ServiceConfig {
             handshake_timeout: DEFAULT_HANDSHAKE_TIMEOUT,
             scheduler_limits: SchedulerLimits::default(),
             watch_unmanaged_ms: DEFAULT_WATCH_UNMANAGED_MS,
+            max_hold_ms: 0,
         }
     }
 }
@@ -1028,6 +1033,8 @@ impl Service {
             live.handshake_timeout = config.handshake_timeout;
             live.scheduler_limits = config.scheduler_limits;
             live.watch_unmanaged_ms = config.watch_unmanaged_ms;
+            // Read at each grant, so reservations already held keep theirs.
+            live.max_hold_ms = config.max_hold_ms;
             state.observation.period = Duration::from_millis(config.watch_unmanaged_ms);
             state.scheduler.set_limits(config.scheduler_limits);
             state.pump(Instant::now());

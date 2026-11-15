@@ -20,7 +20,9 @@ use nix::fcntl::OFlag;
 use toml::{Table, Value};
 
 use crate::service::ServiceConfig;
-use gpudog_core::protocol::{is_valid_gpu_uuid, same_uuid, sanitize_display_text};
+use gpudog_core::protocol::{
+    is_valid_gpu_uuid, same_uuid, sanitize_display_text, MAX_HOLD_LIMIT_MS,
+};
 
 /// Everything `config.toml` can set.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -67,7 +69,7 @@ pub struct ConfigError(pub String);
 
 /// Every key this build understands. Anything else earns a warning: a newer
 /// config must not stop an older daemon, but a typo must not be silent.
-const KNOWN_KEYS: [&str; 11] = [
+const KNOWN_KEYS: [&str; 12] = [
     "log_directory",
     "socket_path",
     "socket_mode",
@@ -79,6 +81,7 @@ const KNOWN_KEYS: [&str; 11] = [
     "max_queued_per_uid",
     "devices",
     "watch_unmanaged_ms",
+    "max_hold_ms",
 ];
 
 const MAX_SOCKET_MODE: u32 = 0o777;
@@ -312,6 +315,10 @@ impl DaemonConfig {
         if let Some(value) = r.integer("max_queued_per_uid", 0, 1, MAX_PER_UID_LIMIT) {
             service.scheduler_limits.max_queued_per_uid = value as u32;
         }
+        // 0 is the default, no limit; the bound is what `Granted` can carry.
+        if let Some(value) = r.integer("max_hold_ms", 0, 0, MAX_HOLD_LIMIT_MS as i64) {
+            service.max_hold_ms = value as u64;
+        }
 
         let invalid_values = r.invalid_values;
         let mut warnings = r.warnings;
@@ -433,7 +440,7 @@ impl DaemonConfig {
 
     /// The limits a reload changes, as `key old -> new`, in a fixed order:
     /// `max_connections`, `max_connections_per_uid`, `handshake_timeout_ms`,
-    /// the scheduler caps, then `watch_unmanaged_ms`.
+    /// the scheduler caps, `max_hold_ms`, then `watch_unmanaged_ms`.
     pub fn limit_changes(&self, new: &Self) -> Vec<String> {
         let (old, new) = (&self.service, &new.service);
         let mut changes = Vec::new();
@@ -466,6 +473,11 @@ impl DaemonConfig {
             "max_queued_per_uid",
             old.scheduler_limits.max_queued_per_uid.to_string(),
             new.scheduler_limits.max_queued_per_uid.to_string(),
+        );
+        compare(
+            "max_hold_ms",
+            old.max_hold_ms.to_string(),
+            new.max_hold_ms.to_string(),
         );
         compare(
             "watch_unmanaged_ms",
