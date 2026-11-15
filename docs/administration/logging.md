@@ -53,8 +53,9 @@ uid=1001 gid=1001 pid=4300 denied: no GPU became available before the deadline
 `released its reservation` also ends a request that was cancelled while it
 waited. A request whose `-t` ran out normally ends with the `denied` line
 above, or with `released its reservation` if the client disconnected at the
-same moment. A client that disconnects right after its reply is not an
-error and is not logged as one. If a user waits well past `-t` and neither line
+same moment. A client that disconnects before or right after the daemon
+replies is not an error: only the usual acquire, grant, denied or released
+lines appear, with no transport error. If a user waits well past `-t` and neither line
 appears, the daemon is probably stuck: restart it when the GPUs are idle.
 Outside the journal, each line also starts with `gpudogd: access:` (see
 [Reading logs](#reading-logs)).
@@ -71,10 +72,13 @@ client; restart it with that flag (see
 logs it only when a client exits right after connecting, which needs no
 action.
 
-`requested unmanaged device GPU-...` means a request named a GPU that this
-daemon does not manage, and it was denied. The user gets
-`GPU-... is not managed by this daemon`; tell them which GPUs to use (see
-[Managing some GPUs](configuration.md#managing-some-gpus)).
+Another request warning, `requested unmanaged device GPU-...`, means a
+request named a GPU that this daemon does not manage. The request's
+`denied: GPU-... is not managed by this daemon` line is always logged; the
+warning is limited as described in [Repeated warnings](#repeated-warnings).
+The user gets the same message; tell them which GPUs to use, for example
+the ones `gpudog dash` lists (see
+[`GPU-... is not managed by this daemon`](../troubleshooting.md#gpu-is-not-managed-by-this-daemon)).
 
 ## Reading logs
 

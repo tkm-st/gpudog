@@ -1294,13 +1294,49 @@ async fn requests_for_an_unmanaged_device_are_throttled_in_the_log() {
             Some(DenyReason::INVALID_REQUEST)
         );
     }
-    let warnings = events
-        .lock()
-        .unwrap()
-        .iter()
-        .filter(|(_, line)| line.contains("requested unmanaged device"))
-        .count();
-    assert_eq!(warnings, 1);
+    let events = events.lock().unwrap();
+    let count = |text: &str| {
+        events
+            .iter()
+            .filter(|(_, line)| line.contains(text))
+            .count()
+    };
+    assert_eq!(count("requested unmanaged device"), 1);
+    // Every denial is still in the audit trail.
+    assert_eq!(
+        count("denied: GPU-elsewhere is not managed by this daemon"),
+        3
+    );
+}
+
+#[tokio::test]
+async fn a_grant_to_a_client_that_hangs_up_at_once_is_logged_and_released() {
+    let (sink, events) = recording_log();
+    let service = Service::start(
+        Arc::new(StaticInventory::with_count(1)),
+        None,
+        test_config(scratch_socket()),
+        sink,
+    )
+    .unwrap();
+    let mut client = Client::ready(&service).await;
+    client.send(want(1)).await;
+    drop(client);
+    let has = |text: &str| {
+        events
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|(_, line)| line.contains(text))
+    };
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while !has("released its reservation") && Instant::now() < deadline {
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert!(has(" granted gpus=[0:"));
+    assert!(has("released its reservation"));
+    assert!(!has("transport error"));
+    assert_eq!(service.with_scheduler(Scheduler::free_device_count), 1);
 }
 
 #[tokio::test]

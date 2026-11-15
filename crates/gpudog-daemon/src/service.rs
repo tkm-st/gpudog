@@ -1596,17 +1596,19 @@ async fn handle_acquire(
     } = match resolved {
         Ok(resolved) => resolved,
         Err((denial, warning)) => {
-            match warning {
-                Some(warning) => shared.log_noise(
+            // The denial is an access line, never throttled; the warning
+            // that explains it is.
+            shared.log(
+                LogLevel::Access,
+                &format!("{peer} denied: {}", String::from_utf8_lossy(&denial.detail)),
+            );
+            if let Some(warning) = warning {
+                shared.log_noise(
                     Some(peer.uid),
                     Noise::UnmanagedDevice,
                     LogLevel::Warning,
                     &format!("{peer} {warning}"),
-                ),
-                None => shared.log(
-                    LogLevel::Access,
-                    &format!("{peer} denied: {}", String::from_utf8_lossy(&denial.detail)),
-                ),
+                );
             }
             return write_within(timeout, line, denial).await;
         }
