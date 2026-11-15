@@ -104,7 +104,8 @@ above them. Anyone who can write to one of those directories, such as
 *   put a symlink in its place that points to another file owned by root.
     The daemon checks the file the symlink points to, so it passes. A file
     that is not TOML stops startup and is refused at a reload, but an empty
-    one resets every setting to its default, at a reload as well;
+    one is accepted, at a reload as well: the daemon then manages every GPU
+    and the per-user limits return to their defaults;
 *   replace the socket directory, so that clients reach a socket they
     control instead of the daemon's.
 

@@ -19,7 +19,7 @@ release's section.
     `gpudog` commands fail until both sides match.
 *   Read the changelog before upgrading. Restarting the daemon ends every
     reservation and fails waiting requests; running commands keep running,
-    but their GPUs may then be given to others. See
+    but GPUs they are not using yet may then be given to others. See
     [Upgrading the package](https://github.com/tkm-st/gpudog/blob/main/docs/installation.md#upgrading-the-package)
     for when to restart.
 
