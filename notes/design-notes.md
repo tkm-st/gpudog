@@ -177,10 +177,11 @@ relies on a few cargo-deb behaviours that are easy to break.
     component only, 0755 restored only under a parent that passes
     `directory_complaint`). The operator still creates a missing parent, and
     the host directory behind a bind that does not create it (Compose long
-    syntax). The unit sets `ProtectSystem=strict` (checked
-    2026-11-15 on WSL2 with an RTX A5000: start, NVML enumeration, socket,
-    reload; GPU process observation could not be checked there). Other
-    hardening options are not added yet.
+    syntax). Hardening options (`ProtectSystem=` and so on) are not added
+    yet. `ProtectSystem=strict` worked on WSL2 with an RTX A5000 (start,
+    NVML enumeration, socket, reload; 2026-11-15), but GPU process
+    observation under it needs a native Linux GPU host, which was not
+    available, so it was taken out again before 0.0.1.
 
 ### Development
 

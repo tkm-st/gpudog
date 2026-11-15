@@ -60,9 +60,7 @@ First release.
     child processes.
 *   `/etc/gpudog/config.toml`. `SIGHUP` (`systemctl reload gpudogd`)
     reloads every setting except the three socket settings.
-*   A Debian package with a systemd unit (`ProtectSystem=strict`: the
-    file system is read-only for the daemon apart from `/run/gpudog`) and a
-    commented configuration
+*   A Debian package with a systemd unit and a commented configuration
     template, a release tarball for x86-64 Linux with glibc 2.28 or later,
     and a Dockerfile for the daemon and for client images. Container images
     are not published.
