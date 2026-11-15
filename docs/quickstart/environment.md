@@ -59,6 +59,9 @@ rejected before allocation. A driver reporting `NotSupported` for a MIG
 query indicates that feature is absent; missing symbols, permission errors
 and other inspection failures are not treated as safe GPU visibility.
 
+Managed GPUs are expected in the `Default` compute mode; see
+[GPU compute modes](../administration/unmanaged-processes.md#gpu-compute-modes).
+
 Set visibility/order restrictions before starting the client or daemon.
 CUDA caches its device view per process; library users must not change the
 environment after discovery. An empty view, including empty

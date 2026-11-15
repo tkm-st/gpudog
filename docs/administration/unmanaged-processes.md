@@ -66,24 +66,31 @@ changes the compute mode. Check it with:
 
 ```shell-session
 $ nvidia-smi --query-gpu=index,uuid,compute_mode --format=csv
+index, uuid, compute_mode
+0, GPU-8f0c3c4e-..., Default
 ```
 
-*   `Exclusive_Process` lets only one process at a time use the GPU through
-    CUDA. GPUDog grants a GPU to the command and all its descendants, so a
-    job that uses one GPU from several processes, such as data loader
-    workers that each use CUDA, fails in the second process with
-    `CUDA-capable device(s) is/are busy or unavailable`. The same error
-    reaches a job if a program started without `gpudog` takes the GPU
-    between the grant and the job's first CUDA call. In return, programs
-    started without `gpudog` cannot share a GPU with a job that is already
-    using it. `gpudog` and `gpudogd` themselves never take the GPU in this
-    mode: they find GPUs without starting CUDA on them.
+*   `Exclusive_Process` lets only one process at a time use a GPU through
+    CUDA, while a GPUDog reservation covers the command and all its
+    descendants. Use it only if every job uses each of its GPUs from a
+    single process. Otherwise use `Default`.
+    *   A job that uses one GPU from several processes, such as data loader
+        workers that each use CUDA, fails in the second process with
+        `CUDA-capable device(s) is/are busy or unavailable`.
+    *   The same error reaches a job if a program started without `gpudog`
+        takes the GPU between the grant and the job's first CUDA call. In
+        return, such a program cannot share a GPU with a job that is
+        already using it.
+    *   `gpudog` and `gpudogd` themselves never take a GPU in this mode:
+        they find GPUs without opening them through CUDA.
 *   `Prohibited` lets no process use the GPU through CUDA. The daemon still
     grants such a GPU, and every job on it fails. Leave it out of `devices`
     (see [Managing some GPUs](configuration.md#managing-some-gpus)).
 
 To go back to the default, run `sudo nvidia-smi -i <GPU> -c DEFAULT`, where
-`<GPU>` is the index or UUID that `nvidia-smi` shows.
+`<GPU>` is the index or UUID that `nvidia-smi` shows. The mode does not
+survive a reboot or a driver reload; if a boot script or service sets it,
+change it there too.
 
 ## WSL2
 

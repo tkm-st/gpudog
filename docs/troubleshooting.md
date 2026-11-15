@@ -205,9 +205,21 @@ are idle (see [Shutdown](administration/daemon.md#shutdown)).
 ## `CUDA-capable device(s) is/are busy or unavailable`
 
 Your job got its GPUs, but CUDA refused them. This error comes from CUDA, not
-from GPUDog. The GPU is probably set to the `Exclusive_Process` or
-`Prohibited` compute mode, in which a job cannot use one GPU from several
-processes, or cannot use it at all. Ask your administrator; see
+from GPUDog. The usual cause is the GPU's compute mode, which you can check
+without root:
+
+```shell-session
+$ nvidia-smi --query-gpu=index,uuid,compute_mode --format=csv
+```
+
+*   `Exclusive_Process` allows only one process per GPU. If your job uses the
+    GPU from several processes, keep CUDA in one of them, for example by
+    doing no CUDA work in data loader workers. A program started without
+    `gpudog` may also have taken the GPU first.
+*   `Prohibited` allows no process on the GPU.
+
+If the mode is `Default`, or you need the GPU from several processes, ask your
+administrator; see
 [GPU compute modes](administration/unmanaged-processes.md#gpu-compute-modes).
 
 ## My GPUs were not released
