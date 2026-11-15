@@ -23,6 +23,8 @@
 
 /* Header bar: dark red in both schemes (white on #8b1a1a is about 9:1). */
 .md-header {
+  /* White focus rings: the red accent is under 3:1 on the bar. */
+  --md-accent-fg-color: #ffffff;
   background-color: var(--md-primary-fg-color);
   color: #ffffff;
 }
