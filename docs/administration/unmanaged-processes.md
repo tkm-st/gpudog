@@ -27,7 +27,9 @@ GPUs idle that nobody is using (see [The queue](../concepts.md#the-queue)).
 If no observed process has a readable owner, as happens with a Docker
 daemon started without `--pid=host`, busy GPUs count as nobody's, and the daemon
 logs `no observed GPU process has a readable owner; busy GPUs cannot be
-counted as anyone's (run a containerized gpudogd with --pid=host)` once.
+counted as anyone's (if gpudogd runs in a container, start it with
+--pid=host)` once. On a host install it means the processes on the GPU are
+hidden from the daemon, as under WSL2 (see below).
 
 The daemon starts with new grants paused until its first successful sample.
 Observation runs in the background, so the daemon keeps answering clients

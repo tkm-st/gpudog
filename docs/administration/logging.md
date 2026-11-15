@@ -61,7 +61,7 @@ Outside the journal, each line also starts with `gpudogd: access:` (see
 
 A request can also log a warning, which starts with the same
 `uid=... gid=... pid=...` (and with `gpudogd: warning:` outside the journal):
-`peer process identity unavailable; GPU processes cannot be matched to this reservation (run a containerized gpudogd with --pid=host)`.
+`peer process identity unavailable; GPU processes cannot be matched to this reservation (if gpudogd runs in a container, start it with --pid=host)`.
 The daemon could not read the client's process. Until that job ends,
 `gpudog dash` shows GPU processes on every GPU that no reservation accounts
 for as `unknown` instead of `not managed`. GPUs in use are still not

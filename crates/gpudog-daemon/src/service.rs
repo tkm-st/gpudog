@@ -1183,7 +1183,8 @@ async fn observation_loop(shared: Arc<Shared>, source: Arc<dyn GpuProcessSource>
                             state.observation.blind_warned = true;
                             unattributed = Some(
                                 "no observed GPU process has a readable owner; busy GPUs cannot be \
-                                 counted as anyone's (run a containerized gpudogd with --pid=host)",
+                                 counted as anyone's (if gpudogd runs in a container, start it with \
+                                 --pid=host)",
                             );
                         }
                         state.observation.rows = rows;
@@ -1658,7 +1659,7 @@ async fn handle_acquire(
             Some(peer.uid),
             Noise::IdentityUnavailable,
             LogLevel::Warning,
-            &format!("{peer} peer process identity unavailable; GPU processes cannot be matched to this reservation (run a containerized gpudogd with --pid=host)"),
+            &format!("{peer} peer process identity unavailable; GPU processes cannot be matched to this reservation (if gpudogd runs in a container, start it with --pid=host)"),
         );
     }
     let resolved = shared.lock().resolve(request);
