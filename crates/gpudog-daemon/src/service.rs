@@ -80,6 +80,7 @@ enum Noise {
     RejectedPeer,
     VersionMismatch,
     IdentityUnavailable,
+    UnmanagedDevice,
     HandshakeTimeout,
     TransportError,
     ProtocolViolation,
@@ -1389,12 +1390,7 @@ async fn serve(stream: UnixStream, mut guard: SessionGuard) {
     };
     match result {
         Ok(()) => {}
-        // A peer that hung up, even mid-frame, is not an error.
-        Err(SessionError::Transport(error))
-            if matches!(
-                error.kind(),
-                io::ErrorKind::ConnectionReset | io::ErrorKind::UnexpectedEof
-            ) => {}
+        Err(SessionError::Transport(error)) if is_hang_up(&error) => {}
         Err(SessionError::Transport(error)) => {
             shared.log_noise(
                 uid,
@@ -1421,6 +1417,16 @@ async fn serve(stream: UnixStream, mut guard: SessionGuard) {
         }
     }
     // `guard` drops here: release, unwind counters, pump.
+}
+
+/// Whether a transport error only means the peer hung up, even mid-frame
+/// or before reading a reply. That is how a session normally ends, not an
+/// error worth logging.
+fn is_hang_up(error: &io::Error) -> bool {
+    matches!(
+        error.kind(),
+        io::ErrorKind::ConnectionReset | io::ErrorKind::UnexpectedEof | io::ErrorKind::BrokenPipe
+    )
 }
 
 async fn session(
@@ -1509,6 +1515,17 @@ async fn session(
         return Err(SessionError::Protocol(ProtocolError::InvalidMessage));
     };
     if hello.version != PROTOCOL_VERSION {
+        // Logged before the reply, so a client that hangs up at once still
+        // leaves the line.
+        shared.log_noise(
+            guard.uid,
+            Noise::VersionMismatch,
+            LogLevel::Warning,
+            &format!(
+                "{} version mismatch (client {})",
+                guard.peer_text, hello.version
+            ),
+        );
         write_within(
             timeout,
             &mut line,
@@ -1521,15 +1538,6 @@ async fn session(
             ),
         )
         .await?;
-        shared.log_noise(
-            guard.uid,
-            Noise::VersionMismatch,
-            LogLevel::Warning,
-            &format!(
-                "{} version mismatch (client {})",
-                guard.peer_text, hello.version
-            ),
-        );
         return Ok(());
     }
     write_within(timeout, &mut line, HelloAck::default()).await?;
@@ -1589,7 +1597,12 @@ async fn handle_acquire(
         Ok(resolved) => resolved,
         Err((denial, warning)) => {
             match warning {
-                Some(warning) => shared.log(LogLevel::Warning, &format!("{peer} {warning}")),
+                Some(warning) => shared.log_noise(
+                    Some(peer.uid),
+                    Noise::UnmanagedDevice,
+                    LogLevel::Warning,
+                    &format!("{peer} {warning}"),
+                ),
                 None => shared.log(
                     LogLevel::Access,
                     &format!("{peer} denied: {}", String::from_utf8_lossy(&denial.detail)),
@@ -1659,11 +1672,11 @@ async fn handle_acquire(
         }
     };
 
-    write(line, to_message(outcome.clone())).await?;
-    match outcome {
+    // The access line comes before the reply, so it is logged even if the
+    // client hangs up at once and the write fails.
+    match &outcome {
         Reply::Denied { detail, .. } => {
             shared.log(LogLevel::Access, &format!("{peer} denied: {detail}"));
-            Ok(())
         }
         Reply::Granted { gpus, uuids } => {
             shared.log(
@@ -1671,17 +1684,23 @@ async fn handle_acquire(
                 &format!(
                     "{peer} granted gpus=[{}]",
                     gpus.iter()
-                        .zip(&uuids)
+                        .zip(uuids)
                         .map(|(number, uuid)| format!("{number}:{uuid}"))
                         .collect::<Vec<_>>()
                         .join(",")
                 ),
             );
-            // Hold the reservation until the client's fd closes. The fd *is*
-            // the lock.
-            await_peer_close(line).await
         }
         Reply::Queued { .. } => unreachable!("the scheduler never re-queues"),
+    }
+    let granted = matches!(outcome, Reply::Granted { .. });
+    write(line, to_message(outcome)).await?;
+    if granted {
+        // Hold the reservation until the client's fd closes. The fd *is*
+        // the lock.
+        await_peer_close(line).await
+    } else {
+        Ok(())
     }
 }
 
