@@ -194,6 +194,14 @@ class ReleaseNotesTests(unittest.TestCase):
         self.assertIn('```shell\nkeep\nthese\n```', notes)
         self.assertIn('| a |\n| b |', notes)
 
+    def test_hard_breaks_html_and_references_are_not_joined(self):
+        kept = ('Break  \nhere.\n\n<!-- note -->\ntext\n\n'
+                '[a]: https://example.com/a\n[b]: https://example.com/b\n\n'
+                '```\n~~~\none\ntwo\n```')
+        result, notes = self.run_notes('v0.1.0', CHANGELOG.replace('*   First.', kept))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(kept, notes)
+
     def test_an_unreleased_version_stops_the_release(self):
         result, _ = self.run_notes('v0.2.0')
         self.assertNotEqual(result.returncode, 0)

@@ -26,27 +26,38 @@ FOOTER = (
 
 
 # A line that starts its own block: a heading, a list item, a table row, a
-# quote, a rule or a fence. Anything else continues the line above it.
-BLOCK_START = re.compile(r"\s*(#|[*+-]\s|\d+[.)]\s|\||>|---|```|~~~)")
+# quote, a rule or setext underline, a fence, HTML or a link reference
+# definition. Anything else continues the line above it.
+BLOCK_START = re.compile(
+    r"\s*(#|[*+-]\s|\d+[.)]\s|\||>|```|~~~|<|\[[^\]]+\]:"
+    r"|(-{3,}|={3,}|\*{3,}|_{3,})\s*$)"
+)
+
+# A line that nothing continues: a heading, a table row, HTML, a link
+# reference definition or a rule.
+SINGLE_LINE = re.compile(r"\s*(#|\||<|\[[^\]]+\]:|(-{3,}|={3,}|\*{3,}|_{3,})\s*$)")
 
 
 def unwrap(text):
     """Joins the hard-wrapped lines of paragraphs and list items. Fenced
-    code, tables and blank lines are left as they are."""
+    code, tables, HTML, reference definitions and hard breaks (two trailing
+    spaces or a backslash) are left as they are."""
     out = []
-    fenced = False
+    fence = None
     for line in text.splitlines():
-        if line.lstrip().startswith(("```", "~~~")):
-            fenced = not fenced
+        marker = line.lstrip()[:3]
+        if marker in ("```", "~~~") and fence in (None, marker):
+            fence = None if fence else marker
             out.append(line)
             continue
+        previous = out[-1] if out else ""
         joinable = (
-            not fenced
-            and out
-            and out[-1].strip()
+            fence is None
+            and previous.strip()
             and line.strip()
             and not BLOCK_START.match(line)
-            and not out[-1].lstrip().startswith(("#", "|", "```", "~~~"))
+            and not SINGLE_LINE.match(previous)
+            and not previous.endswith(("  ", "\\"))
         )
         if joinable:
             out[-1] = out[-1].rstrip() + " " + line.strip()
