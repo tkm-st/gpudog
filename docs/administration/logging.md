@@ -28,8 +28,7 @@ The next line of the same kind ends with, for example,
 `(12 similar lines not logged)`; if no later line of that kind comes, the
 count is not logged. The daemon-wide connection limit and connections
 rejected before the user is known are counted for all users together.
-Acquire, grant and release lines, and denials of queued or accepted
-requests, are never left out. Only the log is throttled: the client still
+Acquire, grant, release and `denied:` lines are never left out. Only the log is throttled: the client still
 gets its error every time. The line that is logged shows the uid, gid and
 pid of that connection only, not those of the lines left out.
 
@@ -55,8 +54,8 @@ waited. A request whose `-t` ran out normally ends with the `denied` line
 above, or with `released its reservation` if the client disconnected at the
 same moment. A client that disconnects before or right after the daemon
 replies is not an error: only the usual acquire, grant, denied or released
-lines appear, with no transport error. If a user waits well past `-t` and neither line
-appears, the daemon is probably stuck: restart it when the GPUs are idle.
+lines appear, with no transport error. If a user waits well past `-t` and neither the
+`denied` nor the `released` line appears, the daemon is probably stuck: restart it when the GPUs are idle.
 Outside the journal, each line also starts with `gpudogd: access:` (see
 [Reading logs](#reading-logs)).
 

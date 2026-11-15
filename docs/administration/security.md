@@ -93,7 +93,8 @@ The daemon checks the configuration file (see
 [Configuration and logging](#configuration-and-logging)) and, unless that
 check is turned off, the socket's own directory (see
 [Socket directory](#socket-directory)). It does not check the
-directories that contain them, or any directory above. Anyone who can write to one of those directories, such as
+directories that contain them, or any directory above. Anyone who can
+write to one of those directories, such as
 `/etc/gpudog`, `/etc`, `/run` or the parent of a custom `--config` or
 `socket_path`, can:
 
