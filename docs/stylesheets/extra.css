@@ -21,6 +21,36 @@
   --gd-strong-fg: #ef9a9a;
 }
 
+/* Header bar: dark red in both schemes (white on #8b1a1a is about 9:1). */
+.md-header {
+  background-color: var(--md-primary-fg-color);
+  color: #ffffff;
+}
+
+/* The header search box: white text on a translucent white field. */
+@media screen and (min-width: 45em) {
+  .md-header .md-search__button {
+    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.15);
+  }
+
+  .md-header .md-search__button:focus,
+  .md-header .md-search__button:hover {
+    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.25);
+  }
+
+  .md-header .md-search__button::before {
+    background-color: #ffffff;
+  }
+
+  /* The "Ctrl+K" key hint */
+  .md-header .md-search__button::after {
+    color: #ffffff;
+    background: rgba(0, 0, 0, 0.25);
+  }
+}
+
 /* Page headings */
 .md-typeset h1 {
   font-weight: 700;

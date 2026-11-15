@@ -40,14 +40,14 @@ The static site is written to `site/`, which is ignored by Git.
 
 ## Theme
 
-The palette (`custom` `primary` and `accent`, so the colours come from the
-stylesheet) and the header logo (`lucide/dog`) are set in `zensical.toml`.
+The palette (`primary` and `accent` both set to `custom`, so the colours come
+from the stylesheet) and the header logo (`lucide/dog`) are set in `zensical.toml`.
 Additional styling is in `docs/stylesheets/extra.css`, loaded through
 `extra_css`:
 
-*   a dark red header and dark red link and active-navigation text in the
-    light scheme, with lighter reds in the dark scheme so they stay readable
-    on slate;
+*   a dark red header bar with white text in both schemes;
+*   dark red link and active-navigation text in the light scheme, with
+    lighter reds in the dark scheme so they stay readable on slate;
 *   a red left bar on `h1` and a red underline on `h2`;
 *   bold, red sidebar section titles.
 
