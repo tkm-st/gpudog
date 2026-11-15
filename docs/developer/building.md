@@ -95,7 +95,7 @@ Options: `--target-dir DIR` (for example a directory under `tmp/`),
 `--filter NAME`. CI also runs actionlint, `scripts/test-actions.py`,
 cargo-deny and the Docker and release checks. Before each commit, run
 `scripts/precommit-check.sh` on the staged changes (it needs python3 and
-git). Before a pull request, run `scripts/check.sh full`, plus `docs` when
+git); `AGENTS.md`, under "Git", says how to install it as a git hook. Before a pull request, run `scripts/check.sh full`, plus `docs` when
 Markdown or `docs/` changed, and `cargo deny --locked check` when
 dependencies changed.
 

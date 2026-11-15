@@ -238,8 +238,9 @@ the gates where it says `verifier`, with any directory under `tmp/` as
     git runs it automatically once it is installed as a hook (below). It
     refuses gitlinks, build artifacts, large blobs, likely secrets and
     conflict markers, and runs `scripts/check-repo-text.py`. To install it,
-    run these from the main checkout (`pre-merge-commit` covers merges
-    without conflicts, which skip `pre-commit`):
+    run these from the main checkout (`pre-merge-commit` covers merge
+    commits made without conflicts, which skip `pre-commit`; a
+    fast-forward runs no hook):
 
     ```shell
     ln -s ../../scripts/precommit-check.sh .git/hooks/pre-commit
@@ -251,12 +252,16 @@ the gates where it says `verifier`, with any directory under `tmp/` as
         so a branch that changes `precommit-check.sh` is not checked by its
         own version; run it by hand there.
     *   If `core.hooksPath` is set, git ignores `.git/hooks`. A
-        per-repository `core.hooksPath` can hold links with an absolute
-        target. A global one runs in every repository, so its hooks should
-        call the repository's own `.git/hooks` hook rather than this script.
-    *   As a hook it refuses a commit that stages nothing, such as
-        `git commit --allow-empty` or an amend that only rewords the
-        message.
+        per-repository `core.hooksPath` can hold links whose target
+        resolves from that directory (an absolute path is simplest). A
+        global one runs in every repository, so its hooks should call the
+        repository's own hook,
+        `"$(git rev-parse --git-common-dir)/hooks/<name>"`, rather than
+        this script.
+    *   As a hook it refuses a commit that changes no file, such as
+        `git commit --allow-empty`, an amend that only rewords the message
+        or a merge whose result equals `HEAD` (for example
+        `git merge -s ours`).
 *   Commit messages start with a gitmoji and use the imperative mood, for
     example `🐛 Release reservations when a session panics`. Common
     prefixes: ✨ feature, 🐛 fix, ♻️ refactor, 📝 docs, ✅ tests, 🔧 config
@@ -348,8 +353,8 @@ Whatever tools you use, ask before any of the following. Ask the person
 you work for or, when you contribute on your own, the maintainer in an
 issue or the pull request:
 
-*   a push (except the maintainer's standing approval under "Git"), pull
-    request or issue, an amend, rebase, reset or tag, or removing a
+*   a push (except pushing `main` under the maintainer's standing
+    approval in "Git"), a pull request or issue, an amend, rebase, reset or tag, or removing a
     worktree whose branch is not merged;
 *   a new or upgraded dependency, a toolchain pin or a CI change;
 *   a change in user-visible behaviour, CLI flags, config keys or defaults,
