@@ -91,7 +91,10 @@ toolkit. Add your workload's dependencies, or copy `/usr/bin/gpudog` from
 the `client` target into a compatible workload image. The official client
 binary uses the Bookworm native runtime; the destination must supply
 compatible glibc/libgcc/native libraries and the injected CUDA/NVML driver
-libraries. See [Build and runtime requirements](../quickstart/environment.md).
+libraries, so set `NVIDIA_DRIVER_CAPABILITIES=compute,utility` in that image
+(with `utility` alone, CUDA is not injected; see
+[CUDA driver errors](../troubleshooting.md#cuda-driver-or-mig-inspection-errors)).
+See [Build and runtime requirements](../quickstart/environment.md).
 
 Exit status and signal forwarding are the same as native `run`. Stopping or
 killing the client container ends its PID namespace and jobs; once all copies

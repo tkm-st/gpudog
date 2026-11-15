@@ -174,15 +174,43 @@ requesting anything.
 
 ## CUDA driver or MIG inspection errors
 
-`CUDA driver unavailable or missing required symbols` means `libcuda.so.1`
-cannot be loaded or lacks required functions. A missing NVML library is
-reported as `libnvidia-ml.so.1 not found; ...` instead. Both `gpudog run`
-and the daemon need the NVIDIA driver. Inside Docker, expose both `compute`
-and `utility` driver capabilities. If `nvidia-smi` works but the message
-says symbols are missing, the driver is probably too old: update it, or on
-a shared host ask your administrator.
-MIG instances and MIG-enabled visible GPUs are unsupported; an inability
-to inspect MIG state is an error, not a fallback to unchecked GPUs.
+```text
+gpudog: CUDA driver unavailable or missing required symbols
+```
+
+The daemon reports the same problem as
+`cannot enumerate GPUs: CUDA driver unavailable or missing required symbols`.
+Both `gpudog run` and the daemon need the NVIDIA driver's CUDA library,
+`libcuda.so.1`. The message means it could not be loaded, or it was loaded
+but lacks a function GPUDog needs; the message is the same in both cases.
+Check these in order, in the environment where the command failed (the host
+or the container):
+
+1.  **In a container, check that CUDA is exposed.**
+    `echo "$NVIDIA_DRIVER_CAPABILITIES"` inside it must include both
+    `compute` and `utility`, or be `all`. With `utility` alone, `nvidia-smi`
+    works there but CUDA does not; without `utility`, `nvidia-smi` and NVML
+    are missing. Start the container with
+    `-e NVIDIA_DRIVER_CAPABILITIES=compute,utility`, or set it with an `ENV`
+    line in the image. The GPUDog images set both.
+2.  **Check that a driver reaches that environment.** Run `nvidia-smi`
+    there. If it is missing or fails, a container needs `--gpus` (or `gpus:`
+    in Compose) and the NVIDIA Container Toolkit (see
+    [`failed to discover GPU vendor from CDI`](#failed-to-discover-gpu-vendor-from-cdi)),
+    and a host needs the NVIDIA driver installed.
+3.  **Otherwise, the driver is incomplete or too old.** If `nvidia-smi`
+    works and both capabilities are exposed, reinstall or update the NVIDIA
+    driver.
+
+Installing or updating the host's driver, and setting up the daemon's
+container, is the administrator's task; on a shared host, ask them. Your
+own client container's settings are yours to fix.
+
+A missing NVML library is reported as `libnvidia-ml.so.1 not found; ...`
+instead; the same checks apply. MIG instances and MIG-enabled visible GPUs
+are unsupported, and an inability to inspect MIG state is an error, not a
+fallback to unchecked GPUs (see `--gpus does not support MIG devices yet`
+above).
 
 ## `failed to discover GPU vendor from CDI`
 

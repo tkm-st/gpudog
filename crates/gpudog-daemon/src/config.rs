@@ -138,8 +138,11 @@ impl Reader<'_> {
 
     /// `low..=high` bounds what the destination can hold, not what is
     /// sensible: that is [`DaemonConfig::validate`]'s job, and it must run
-    /// after the command line has been merged in.
-    fn integer(&mut self, key: &str, low: i64, high: i64) -> Option<i64> {
+    /// after the command line has been merged in. `documented_low` is the
+    /// minimum the documentation gives for the key, which the warning for a
+    /// value outside `low..=high` names; it can be above `low` because
+    /// `validate` refuses the values in between with its own error.
+    fn integer(&mut self, key: &str, low: i64, documented_low: i64, high: i64) -> Option<i64> {
         let value = match self.table.get(key)? {
             Value::Integer(value) => *value,
             _ => {
@@ -148,10 +151,7 @@ impl Reader<'_> {
             }
         };
         if !(low..=high).contains(&value) {
-            // The message gives the documented range. Every integer key's
-            // minimum is 1: a 0 is let through here only so that `validate`
-            // can stop startup with its own "must be at least 1" error.
-            self.warn(key, &format!("must be between {} and {high}", low.max(1)));
+            self.warn(key, &format!("must be between {documented_low} and {high}"));
             return None;
         }
         Some(value)
@@ -286,27 +286,30 @@ impl DaemonConfig {
             service.require_secure_directory = value;
         }
         // The `as` casts below are lossless: `integer` has already bounded
-        // each value to its destination's range.
-        if let Some(value) = r.integer("max_connections", 0, MAX_CONNECTIONS_LIMIT) {
+        // each value to its destination's range. Each key is documented as
+        // starting at 1; a 0 passes `integer` so that `validate` can refuse
+        // it with its own error.
+        if let Some(value) = r.integer("max_connections", 0, 1, MAX_CONNECTIONS_LIMIT) {
             service.max_connections = value as usize;
         }
-        if let Some(value) = r.integer("max_connections_per_uid", 0, MAX_CONNECTIONS_LIMIT) {
+        if let Some(value) = r.integer("max_connections_per_uid", 0, 1, MAX_CONNECTIONS_LIMIT) {
             service.max_connections_per_uid = value as usize;
         }
-        if let Some(value) = r.integer("handshake_timeout_ms", 0, MAX_HANDSHAKE_TIMEOUT_MS) {
+        if let Some(value) = r.integer("handshake_timeout_ms", 0, 1, MAX_HANDSHAKE_TIMEOUT_MS) {
             service.handshake_timeout = Duration::from_millis(value as u64);
         }
         if let Some(value) = r.integer(
             "watch_unmanaged_ms",
             0,
+            1,
             crate::service::MAX_WATCH_UNMANAGED_MS as i64,
         ) {
             service.watch_unmanaged_ms = value as u64;
         }
-        if let Some(value) = r.integer("max_held_per_uid", 0, MAX_PER_UID_LIMIT) {
+        if let Some(value) = r.integer("max_held_per_uid", 0, 1, MAX_PER_UID_LIMIT) {
             service.scheduler_limits.max_held_per_uid = value as u32;
         }
-        if let Some(value) = r.integer("max_queued_per_uid", 0, MAX_PER_UID_LIMIT) {
+        if let Some(value) = r.integer("max_queued_per_uid", 0, 1, MAX_PER_UID_LIMIT) {
             service.scheduler_limits.max_queued_per_uid = value as u32;
         }
 
