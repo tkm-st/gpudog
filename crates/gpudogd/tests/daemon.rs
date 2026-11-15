@@ -434,6 +434,43 @@ fn a_flag_cannot_make_an_invalid_combination_valid_or_vice_versa() {
 }
 
 #[test]
+fn a_missing_socket_directory_is_created_despite_a_strict_umask() {
+    // Its own parent, so the runner's umask cannot make it group-writable.
+    let parent = scratch("parent");
+    std::fs::create_dir(&parent).unwrap();
+    std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let directory = parent.join("run");
+    let socket = directory.join("d.sock");
+    let config = config_file("");
+    let mut command = Command::new("sh");
+    command
+        .args(["-c", "umask 077 && exec \"$0\" \"$@\""])
+        .arg(env!("CARGO_BIN_EXE_gpudogd"))
+        .args([
+            "-c",
+            config.to_str().unwrap(),
+            "-s",
+            socket.to_str().unwrap(),
+        ])
+        .args(["-n", "1"])
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .env_remove("JOURNAL_STREAM");
+    let daemon = Daemon(command.spawn().unwrap());
+    wait_for(&socket);
+    let mode = std::fs::metadata(&directory).unwrap().permissions().mode() & 0o7777;
+    kill(Pid::from_raw(daemon.id() as i32), Signal::SIGTERM).unwrap();
+    let (success, stderr) = finish(daemon);
+    assert!(success, "{stderr}");
+    assert_eq!(mode, 0o755, "{stderr}");
+    let created = format!("created socket directory {}", directory.display());
+    assert!(stderr.contains(&created), "{stderr}");
+    std::fs::remove_file(&config).unwrap();
+    std::fs::remove_dir(&directory).unwrap();
+    std::fs::remove_dir(&parent).unwrap();
+}
+
+#[test]
 fn a_startup_failure_is_reported_with_its_cause() {
     // Make the rejection independent of the runner's UID and umask. A safe
     // root-owned tmp/ would start the daemon and make finish wait forever.

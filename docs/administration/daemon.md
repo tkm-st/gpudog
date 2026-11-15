@@ -19,7 +19,7 @@ What each flag is for:
 | `--gpus all` | The daemon must see every GPU it manages. A subset also works; see below. |
 | `--pid=host` | Gives the observer host PID/procfs visibility for process-tree identities. Clients keep their own PID namespaces. |
 | `--userns=host` | Keeps host UIDs on an engine with user namespace remapping enabled; without it, the daemon rejects clients whose UIDs have no mapping. It has no effect on an engine without remapping. |
-| `-v /run/gpudog:/run/gpudog` | Shares the socket with clients on the host. Docker creates the host directory if it is missing. |
+| `-v /run/gpudog:/run/gpudog` | Shares the socket with clients on the host. A rootful Docker engine without user namespace remapping creates the host directory, owned by root, if it is missing; otherwise create it first with `sudo install -d -m 0755 /run/gpudog`. |
 | `-v /etc/gpudog:/etc/gpudog:ro` | Optional. Supplies `config.toml`; mount it read-only. The image has no `config.toml`, so without this mount the daemon uses the defaults and logs a warning at every start. |
 
 Do **not** use these flags:
@@ -91,9 +91,11 @@ At startup the daemon:
     (prefixed with `gpudogd: error:` outside the journal).
     Narrow its view with `CUDA_VISIBLE_DEVICES` (or Docker `--gpus`).
 4.  Creates the socket directory with mode `0755` if it is missing, and logs
-    `created socket directory <path>`. Only the last directory is created:
-    if its parent is missing too, startup fails with
-    `cannot create <path>: No such file or directory`. Then it checks the
+    `created socket directory <path>`. Only the socket directory itself is
+    created: if its parent is missing too, startup fails with
+    `cannot create <path>: No such file or directory` (prefixed with
+    `gpudogd: error: startup failed:` outside the journal), where `<path>`
+    is the socket directory. Then it checks the
     socket directory, binds the socket, and sets its permissions to
     `socket_mode`.
 

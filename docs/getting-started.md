@@ -15,8 +15,9 @@ $ docker run -d --name gpudogd --pid=host --userns=host --gpus all \
     gpudogd
 ```
 
-Docker creates `/run/gpudog` on the host if it is missing. It must be owned
-by root and must not be writable by group or others (`0755`). The daemon
+If `/run/gpudog` is missing on the host, `-v` creates it; with other Docker
+setups, create it first with `sudo install -d -m 0755 /run/gpudog`. It must
+be owned by root and must not be writable by group or others (`0755`). The daemon
 refuses to start otherwise; see [Security model](administration/security.md)
 for the reason.
 

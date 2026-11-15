@@ -40,8 +40,10 @@ unprivileged GPU-only permission.
 
 ## Start the daemon
 
-Start the daemon container first. Docker creates `/run/gpudog` on the host,
-owned by root with mode `0755`, if it is missing:
+Start the daemon container first: its `-v` creates `/run/gpudog` on the host
+if it is missing, while the clients' `--mount` needs the directory to exist.
+With a rootless engine or user namespace remapping, create it first with
+`sudo install -d -m 0755 /run/gpudog`.
 
 ```shell-session
 $ docker run -d --name gpudogd --userns=host --pid=host --network none --gpus all \

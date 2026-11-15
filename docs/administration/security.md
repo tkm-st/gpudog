@@ -30,8 +30,9 @@ told it holds GPUs that are in use.
 
 When the directory is missing, the daemon creates it, owned by its own user
 with mode `0755`, and then checks it like any other. It creates only that
-last directory, never its parents, and does not change the mode of anything
-it did not just create.
+directory, never its parents. It undoes a restrictive umask only when the
+parent passes the same check, so that nobody else could have put another
+directory in its place.
 
 `require_secure_directory = false` and `--allow-insecure-socket-directory`
 turn this check off. Use them only for local testing.

@@ -800,17 +800,14 @@ impl Service {
         let _ = scheduler.set_managed(&managed);
         scheduler.set_observed_usage(observing, &[]);
         let path = config.socket_path.clone();
-        if create_socket_directory(socket_directory(&path)).map_err(StartError)? {
+        let directory = socket_directory(&path);
+        if create_socket_directory(directory).map_err(StartError)? {
             log(
                 LogLevel::Access,
-                &format!(
-                    "created socket directory {}",
-                    socket_directory(&path).display()
-                ),
+                &format!("created socket directory {}", directory.display()),
             );
         }
         if config.require_secure_directory {
-            let directory = socket_directory(&path);
             if let Some(complaint) = directory_complaint(directory) {
                 return Err(StartError(format!("refusing to bind: {complaint}")));
             }
@@ -1283,9 +1280,18 @@ fn create_socket_directory(directory: &Path) -> Result<bool, String> {
         Err(error) => return Err(failed(error)),
     }
     // The umask may have removed bits clients need to reach the socket.
-    // Change the mode through a descriptor that refuses a symlink, so a
-    // path swapped in under a writable parent is never chmodded, and only
-    // when the directory is ours; anything else fails the check later.
+    // Restore them only when nobody else can rename entries in the parent,
+    // so the directory opened is the one just made; under a parent others
+    // can write, a swapped-in directory of ours could be chmodded instead.
+    // The descriptor refuses a symlink, and only a directory we own is
+    // changed; anything else fails the check later.
+    let parent = match directory.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent,
+        _ => Path::new("."),
+    };
+    if directory_complaint(parent).is_some() {
+        return Ok(true);
+    }
     let flags = nix::fcntl::OFlag::O_DIRECTORY | nix::fcntl::OFlag::O_NOFOLLOW;
     let opened = std::fs::OpenOptions::new()
         .read(true)

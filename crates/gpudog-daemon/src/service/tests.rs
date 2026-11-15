@@ -851,7 +851,9 @@ async fn start_creates_only_the_last_directory() {
 }
 
 #[tokio::test]
-async fn start_leaves_a_socket_directory_symlink_to_the_check() {
+async fn start_leaves_an_existing_socket_directory_symlink_to_the_check() {
+    // mkdir sees the link as existing, so nothing is created or chmodded.
+    // The O_NOFOLLOW open guards a race that cannot be staged here.
     let target = scratch_socket().with_extension("target");
     std::fs::create_dir_all(&target).unwrap();
     std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o777)).unwrap();

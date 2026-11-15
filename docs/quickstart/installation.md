@@ -17,8 +17,8 @@ $ docker run -d --name gpudogd --pid=host --userns=host --gpus all \
 ```
 
 !!! warning
-    Docker creates `/run/gpudog` on the host if it is missing.
-    `/run/gpudog` must be owned by root with mode `0755`. The daemon refuses
+    `-v` creates `/run/gpudog` on the host if it is missing; it must be
+    owned by root with mode `0755`. The daemon refuses
     to bind otherwise, because a socket directory that others can write to
     would let any user hijack the connection.
 
