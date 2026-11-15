@@ -90,7 +90,7 @@ python3 scripts/release-check.py         # glibc 2.28 artifacts and CPU checks
 python3 scripts/release-check.py --gpu   # also actual driver/GPU checks
 uvx zensical build --clean
 npx --yes markdownlint-cli2@0.24.0 "**/*.md" "#target" "#tmp" "#externals" "#build" "#.worktrees"
-python3 scripts/check-repo-text.py      # quoted paths in AGENTS.md
+python3 scripts/check-repo-text.py      # AGENTS.md paths, stated protocol version
 scripts/precommit-check.sh               # staged index, before each commit
 ```
 

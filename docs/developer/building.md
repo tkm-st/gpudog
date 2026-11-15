@@ -87,7 +87,7 @@ Zensical version is pinned more tightly:
 | `quick` | `cargo fmt`, Clippy, build and tests | cargo, a C compiler (`cc`) |
 | `full` | `quick`, plus the release build and release tests | as `quick` |
 | `release` | the release build and release tests | as `quick` |
-| `text` | markdownlint and `scripts/check-repo-text.py` (quoted paths in `AGENTS.md`) | npx, python3, git |
+| `text` | markdownlint and `scripts/check-repo-text.py` (quoted paths in `AGENTS.md`, and the protocol version stated in the docs) | npx, python3, git |
 | `docs` | `text`, plus the Zensical build | npx, python3, git, uv |
 
 Options: `--target-dir DIR` (for example a directory under `tmp/`),
