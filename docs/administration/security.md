@@ -94,8 +94,17 @@ The daemon checks the configuration file (see
 check is turned off, the socket's own directory (see
 [Socket directory](#socket-directory)). It does not check the directories
 above them. Anyone who can write to one of those directories, such as
-`/etc`, `/run` or the parent of a custom `--config` or `socket_path`, can
-rename the checked directory and put their own file or socket in its place.
+`/etc/gpudog`, `/etc`, `/run` or the parent of a custom `--config` or
+`socket_path`, can:
+
+*   remove or rename the configuration file, or a directory above it, so
+    that the daemon uses the default settings the next time it starts;
+*   put a symlink in its place that points to another file owned by root,
+    which passes the check because the daemon checks the file the symlink
+    points to;
+*   replace the socket directory, so that clients reach their socket
+    instead of the daemon's.
+
 Keep every directory on both paths owned by root and not writable by
 others. The Debian package and the default paths (`/etc/gpudog`,
 `/run/gpudog`) already do.

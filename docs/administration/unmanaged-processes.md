@@ -16,12 +16,13 @@ are not revoked; labels are not an allocation authorization decision.
 A GPU that GPUDog has not reserved but that is busy counts as the GPU of
 every user with a process on it: it counts towards how many GPUs each such
 user already uses, which orders [the queue](../concepts.md#the-queue).
-Processes of root, such as a display server started by root, count as
-uid 0's. Whoever's
-it is, a request that cannot be met without GPUs busy outside GPUDog, or
-without GPUs its own user is using, keeps only those GPUs from the
-requests behind it: a process outside GPUDog may never end, and a
-user's own jobs should not keep GPUs idle that nobody is using (see [The queue](../concepts.md#the-queue)).
+Processes of root count as uid 0's.
+
+Whoever's it is, a request that cannot be met without GPUs busy outside
+GPUDog, or without GPUs its own user is using, keeps only those GPUs from
+the requests behind it: a process outside GPUDog may never end, and a
+user's own jobs should not keep GPUs idle that nobody is using (see
+[The queue](../concepts.md#the-queue)).
 
 If no observed process has a readable owner, as happens with a Docker
 daemon started without `--pid=host`, busy GPUs count as nobody's, and the daemon
@@ -46,10 +47,10 @@ feature. Longer intervals delay usage/release detection.
 
 A display server (Xorg, Xwayland or a Wayland compositor) keeps a process
 on the GPU it draws with for as long as it runs, so the daemon never grants
-that GPU. `gpudog dash` shows it as a `not managed` row on that GPU. A
-display server started by root counts as uid 0's; one started by a
-logged-in user counts as that user's, so that user always counts as using one GPU more
-and is served later in the queue.
+that GPU. `gpudog dash` usually shows it as a `not managed` row on that
+GPU. A display server started by root counts as uid 0's; one started by a
+logged-in user counts as that user's, so that user always counts as using
+one GPU more and is served later in the queue.
 
 Leave such a GPU out of `devices` (see
 [Managing some GPUs](configuration.md#managing-some-gpus)) and

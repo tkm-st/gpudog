@@ -125,11 +125,10 @@ What remains from earlier versions:
 
 *   Protocol versions 2 to 5 are listed under
     [Compatibility rules](protocol.md#compatibility-rules). The v3 to v5
-    golden fixtures in `crates/gpudog-core/tests/golden/` and their
-    generators (`scripts/gen-golden-v3.py` to `gen-golden-v5.py`) are kept.
-    The fixtures document earlier wire layouts and are not tested; the
-    generators are kept because `gen-golden-v6.py` builds on them. Only
-    version 6 is spoken and tested.
+    golden fixtures in `crates/gpudog-core/tests/golden/` document earlier
+    wire layouts and are not tested. Their generators
+    (`scripts/gen-golden-v3.py` to `gen-golden-v5.py`) stay because
+    `gen-golden-v6.py` builds on them. Only version 6 is spoken and tested.
 *   Earlier daemons wrote log files. The `log_directory` key and
     `--log-directory` option are accepted with a warning and ignored (see
     [Logging](../administration/logging.md)).

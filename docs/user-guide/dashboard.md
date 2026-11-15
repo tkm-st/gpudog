@@ -134,8 +134,9 @@ count still includes it.
     retrying.
 *   The dashboard opens a new connection for each refresh and closes it
     afterwards, so it does not keep one of your per-user connections open
-    between refreshes. Each running `gpudog run` also holds one. A refresh
-    is refused while you already have the maximum number open (16 unless
-    your administrator changed it): the dashboard shows `too many concurrent
+    between refreshes. Each `gpudog run`, running or still waiting, also
+    holds one. A refresh is refused while you already have the maximum
+    number open (16 unless your administrator changed it): the dashboard
+    shows `Cannot reach gpudogd: invalid request: too many concurrent
     connections for this user` (see [Troubleshooting](../troubleshooting.md))
     and keeps retrying.

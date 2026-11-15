@@ -18,7 +18,7 @@ installed in the project. The full documentation check,
 $ uvx zensical serve
 ```
 
-Open <http://localhost:8000>. The page reloads when a file changes.
+Open <http://localhost:8000/gpudog/>. The page reloads when a file changes.
 
 ## Build
 

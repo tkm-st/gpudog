@@ -15,7 +15,8 @@ decisions that still hold, not future requirements.
 *   The socket directory is shared between the daemon container and host.
     Its ownership and permissions prevent socket replacement attacks.
 *   `SO_PEERCRED` identifies users; unmapped/overflow UIDs are rejected.
-    The current supported client topology is host-only.
+    Clients run on the daemon's host, directly or in containers that share
+    the host user namespace and the socket directory.
 *   Connection and per-user caps bound the fd-based reservations. Pre-acquire
     reads and writes have deadlines.
 

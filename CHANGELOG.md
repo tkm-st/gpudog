@@ -8,8 +8,9 @@ Notable changes to GPUDog. Each release also has a Debian changelog entry in
 Releases before 1.0 make **no compatibility promise**. Any release may change
 the wire protocol, the configuration file, command-line options, messages or
 log lines. Every such change is listed in
-[CHANGELOG.md](https://github.com/tkm-st/gpudog/blob/main/CHANGELOG.md),
-and each release's notes contain its section.
+[CHANGELOG.md](https://github.com/tkm-st/gpudog/blob/main/CHANGELOG.md)
+under the release that makes it, and each release's notes include that
+release's section.
 
 *   Upgrade `gpudog` and `gpudogd` together, including client container
     images. With the current handshake, a client and a daemon that speak

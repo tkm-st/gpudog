@@ -157,10 +157,9 @@ includes only M devices managed here`.
 
 ## `daemon GPU N does not exist; this host has M GPUs`
 
-The request named a daemon GPU number the daemon does not have. Current
-clients send UUIDs, so this normally comes only from an old or third-party
-client. Use `gpudog run -g` with CUDA numbers or UUIDs, and compare GPUs in
-`gpudog dash`.
+Requests name GPUs by CUDA number or UUID, never by daemon GPU number, so
+no current client should get this message. If you see it, report it with
+the command you ran and the daemon log.
 
 ## `no GPUs are visible in this CUDA environment`
 
@@ -210,7 +209,13 @@ without root:
 
 ```shell-session
 $ nvidia-smi --query-gpu=index,uuid,compute_mode --format=csv
+index, uuid, compute_mode
+0, GPU-8f0c3c4e-..., Exclusive_Process
 ```
+
+The `index` column is neither your CUDA number nor the daemon GPU number;
+find your GPU by the `uuid` column, which matches `CUDA_VISIBLE_DEVICES`
+in your job.
 
 *   `Exclusive_Process` allows only one process per GPU. If your job uses the
     GPU from several processes, keep CUDA in one of them, for example by
