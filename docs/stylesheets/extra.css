@@ -1,17 +1,24 @@
-/* GPUDog documentation theme: green highlights and stronger headings. */
+/* GPUDog documentation theme: dark red highlights and stronger headings. */
 
-:root {
-  --gd-heading-accent: #4caf50;
-  --gd-strong-fg: #2e7d32;
-}
-
-[data-md-color-scheme="default"][data-md-color-primary="green"] {
-  /* Built-in green links (#4caf50) are too light on white. */
-  --md-typeset-a-color: var(--gd-strong-fg);
+:root,
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #8b1a1a;
+  --md-primary-fg-color--light: #b71c1c;
+  --md-primary-fg-color--dark: #6d0f0f;
+  --md-accent-fg-color: #c62828;
+  --md-accent-fg-color--transparent: rgba(198, 40, 40, 0.1);
+  --md-typeset-a-color: #b71c1c;
+  --gd-heading-accent: #b71c1c;
+  --gd-strong-fg: #8b1a1a;
 }
 
 [data-md-color-scheme="slate"] {
-  --gd-strong-fg: #81c784;
+  /* Dark red is too dark to read on the slate background. */
+  --md-accent-fg-color: #ef5350;
+  --md-accent-fg-color--transparent: rgba(239, 83, 80, 0.1);
+  --md-typeset-a-color: #ef9a9a;
+  --gd-heading-accent: #e57373;
+  --gd-strong-fg: #ef9a9a;
 }
 
 /* Page headings */
