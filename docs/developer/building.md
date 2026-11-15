@@ -193,8 +193,9 @@ Run the release guard tests locally with `uv run scripts/test-actions.py`
 (uv installs the PyYAML it needs).
 They execute the actual inline workflow scripts against temporary manifests
 and a mock `gh`, checking version mismatch, SemVer prereleases, draft retry,
-upload failure, refusal to overwrite a published release, and that the
-Pages jobs keep their permissions and pinned actions. They never call
+upload failure and refusal to overwrite a published release. They also
+check statically that the Pages jobs keep their permissions, pinned actions
+and stable-only deploy. They never call
 the GitHub API and do not replace a hosted workflow test.
 
 ## Packaging

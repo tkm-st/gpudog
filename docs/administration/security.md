@@ -98,10 +98,13 @@ above them. Anyone who can write to one of those directories, such as
 `socket_path`, can:
 
 *   remove or rename the configuration file, or a directory above it, so
-    that the daemon uses the default settings the next time it starts;
-*   put a symlink in its place that points to another file owned by root,
-    which passes the check because the daemon checks the file the symlink
-    points to;
+    that the daemon starts with the default settings the next time (it
+    logs `no configuration file at <path>; using the defaults`), or, with a
+    custom `--config`, does not start;
+*   put a symlink in its place that points to another file owned by root.
+    The daemon checks the file the symlink points to, so it passes. A file
+    that is not TOML stops startup and is refused at a reload, but an empty
+    one resets every setting to its default, at a reload as well;
 *   replace the socket directory, so that clients reach a socket they
     control instead of the daemon's.
 

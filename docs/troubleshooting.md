@@ -213,8 +213,8 @@ index, uuid, compute_mode
 0, GPU-8f0c3c4e-..., Exclusive_Process
 ```
 
-The `index` column is neither your CUDA number nor the daemon GPU number;
-find your GPU by the `uuid` column, which matches `CUDA_VISIBLE_DEVICES`
+The `index` column may differ from both your CUDA number and the daemon GPU
+number; find your GPU by the `uuid` column, which matches `CUDA_VISIBLE_DEVICES`
 in your job.
 
 *   `Exclusive_Process` allows only one process per GPU. If your job uses the
