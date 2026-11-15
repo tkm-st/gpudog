@@ -23,7 +23,7 @@ release's section.
     [Upgrading the package](https://github.com/tkm-st/gpudog/blob/main/docs/installation.md#upgrading-the-package)
     for when to restart.
 
-## [0.0.1] - Unreleased
+## [0.0.1] - 2026-11-15
 
 First release.
 
