@@ -45,7 +45,9 @@ from the stylesheet) and the header logo (`lucide/dog`) are set in `zensical.tom
 Additional styling is in `docs/stylesheets/extra.css`, loaded through
 `extra_css`:
 
-*   a dark red header bar with white text in both schemes;
+*   a dark red header bar with white text, a matching search box and white
+    keyboard focus rings in both schemes (the red accent is too faint on the
+    bar);
 *   dark red link and active-navigation text in the light scheme, with
     lighter reds in the dark scheme so they stay readable on slate;
 *   a red left bar on `h1` and a red underline on `h2`;
