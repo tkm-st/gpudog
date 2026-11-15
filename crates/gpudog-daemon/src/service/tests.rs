@@ -523,6 +523,49 @@ async fn rejects_a_client_speaking_another_protocol_version() {
 }
 
 #[tokio::test]
+async fn logs_a_version_mismatch_even_if_the_client_hangs_up_at_once() {
+    let (sink, events) = recording_log();
+    let service = Service::start(
+        Arc::new(StaticInventory::with_count(1)),
+        None,
+        test_config(scratch_socket()),
+        sink,
+    )
+    .unwrap();
+    let mut client = Client::connect(&service).await;
+    client
+        .send(protocol::Hello {
+            version: PROTOCOL_VERSION + 99,
+        })
+        .await;
+    drop(client);
+    let logged = || {
+        events.lock().unwrap().iter().any(|(level, line)| {
+            *level == LogLevel::Warning && line.contains("version mismatch (client")
+        })
+    };
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while !logged() && Instant::now() < deadline {
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert!(logged());
+}
+
+#[test]
+fn a_peer_that_hangs_up_is_not_a_transport_error() {
+    for kind in [
+        io::ErrorKind::ConnectionReset,
+        io::ErrorKind::UnexpectedEof,
+        io::ErrorKind::BrokenPipe,
+    ] {
+        assert!(is_hang_up(&io::Error::from(kind)), "{kind:?}");
+    }
+    assert!(!is_hang_up(&io::Error::from(
+        io::ErrorKind::PermissionDenied
+    )));
+}
+
+#[tokio::test]
 async fn drops_a_client_that_skips_the_handshake() {
     let service = start(1);
     let mut client = Client::connect(&service).await;
@@ -1230,6 +1273,70 @@ async fn denies_an_acquire_naming_a_device_it_does_not_manage() {
     assert!(events.lock().unwrap().iter().any(|(level, line)| {
         *level == LogLevel::Warning && line.ends_with(" requested unmanaged device GPU-elsewhere")
     }));
+}
+
+#[tokio::test]
+async fn requests_for_an_unmanaged_device_are_throttled_in_the_log() {
+    // Each request is a fresh connection, as `gpudog run` makes them; only
+    // the first warning in the window is logged.
+    let (sink, events) = recording_log();
+    let service = Service::start(
+        Arc::new(StaticInventory::with_count(1)),
+        None,
+        test_config(scratch_socket()),
+        sink,
+    )
+    .unwrap();
+    for _ in 0..3 {
+        let mut client = Client::ready(&service).await;
+        assert_eq!(
+            deny_reason(&client.acquire(by_uuid(&["GPU-elsewhere"])).await),
+            Some(DenyReason::INVALID_REQUEST)
+        );
+    }
+    let events = events.lock().unwrap();
+    let count = |text: &str| {
+        events
+            .iter()
+            .filter(|(_, line)| line.contains(text))
+            .count()
+    };
+    assert_eq!(count("requested unmanaged device"), 1);
+    // Every denial is still in the audit trail.
+    assert_eq!(
+        count("denied: GPU-elsewhere is not managed by this daemon"),
+        3
+    );
+}
+
+#[tokio::test]
+async fn a_grant_to_a_client_that_hangs_up_at_once_is_logged_and_released() {
+    let (sink, events) = recording_log();
+    let service = Service::start(
+        Arc::new(StaticInventory::with_count(1)),
+        None,
+        test_config(scratch_socket()),
+        sink,
+    )
+    .unwrap();
+    let mut client = Client::ready(&service).await;
+    client.send(want(1)).await;
+    drop(client);
+    let has = |text: &str| {
+        events
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|(_, line)| line.contains(text))
+    };
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while !has("released its reservation") && Instant::now() < deadline {
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert!(has(" granted gpus=[0:"));
+    assert!(has("released its reservation"));
+    assert!(!has("transport error"));
+    assert_eq!(service.with_scheduler(Scheduler::free_device_count), 1);
 }
 
 #[tokio::test]

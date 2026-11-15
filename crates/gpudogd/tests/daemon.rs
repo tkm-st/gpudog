@@ -55,6 +55,25 @@ impl std::ops::DerefMut for Daemon {
     }
 }
 
+impl Daemon {
+    /// Waits for the daemon to exit, for as long as `wait_for` waits for it
+    /// to start. A daemon that never exits fails the test, and `Drop` kills
+    /// it, instead of hanging the test run.
+    fn wait_exit(&mut self) -> std::process::ExitStatus {
+        let start = Instant::now();
+        loop {
+            if let Some(status) = self.0.try_wait().unwrap() {
+                return status;
+            }
+            assert!(
+                start.elapsed() < Duration::from_secs(10),
+                "daemon did not exit"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+}
+
 impl Drop for Daemon {
     fn drop(&mut self) {
         if let Ok(None) = self.0.try_wait() {
@@ -92,7 +111,7 @@ fn wait_for(path: &Path) {
 
 /// Waits for exit and returns (success, stderr).
 fn finish(mut child: Daemon) -> (bool, String) {
-    let status = child.wait().unwrap();
+    let status = child.wait_exit();
     let mut stderr = String::new();
     child
         .stderr
@@ -585,7 +604,7 @@ async fn sighup_reloads_the_limits_and_keeps_serving() {
 
     kill(Pid::from_raw(daemon.id() as i32), Signal::SIGTERM).unwrap();
     log.wait_for("gpudogd stopped");
-    assert!(daemon.wait().unwrap().success());
+    assert!(daemon.wait_exit().success());
     assert!(!socket.exists(), "socket left behind");
 }
 
@@ -619,7 +638,7 @@ fn a_sighup_while_starting_does_not_end_the_daemon() {
     assert!(daemon.try_wait().unwrap().is_none(), "daemon ended");
     kill(Pid::from_raw(daemon.id() as i32), Signal::SIGTERM).unwrap();
     log.wait_for("gpudogd stopped");
-    assert!(daemon.wait().unwrap().success());
+    assert!(daemon.wait_exit().success());
     std::fs::remove_file(&config).unwrap();
 }
 
@@ -720,6 +739,6 @@ async fn sighup_applies_a_changed_devices_list() {
 
     kill(Pid::from_raw(daemon.id() as i32), Signal::SIGTERM).unwrap();
     log.wait_for("gpudogd stopped");
-    assert!(daemon.wait().unwrap().success());
+    assert!(daemon.wait_exit().success());
     std::fs::remove_file(&config).unwrap();
 }

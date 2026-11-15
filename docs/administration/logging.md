@@ -6,7 +6,7 @@ files and no log directory to configure.
 | Level | Contents |
 | -- | -- |
 | Access / info | Startup (the first line is `gpudogd <version> (protocol v<N>) starting`) and shutdown, loaded config, configuration reloads, GPUs, acquire, grant, denial and release, and notes on GPU process observation (a job with too many processes to follow, a kernel without child lists). |
-| Warning | Config warnings, a missing default config file, keys that need a restart after a reload, connection limits reached, rejected connections, version mismatches, handshake timeouts, a client whose process the daemon cannot read, and GPU processes without a readable owner. |
+| Warning | Config warnings, a missing default config file, keys that need a restart after a reload, connection limits reached, rejected connections, version mismatches, handshake timeouts, a client whose process the daemon cannot read, a request for a GPU the daemon does not manage, and GPU processes without a readable owner. |
 | Error | Protocol violations, transport errors, startup failures, failed GPU observations (such as `cannot read procfs: ...`) and refused reloads ([Changing the configuration](configuration.md#changing-the-configuration)). |
 
 Untrusted text is sanitised and bounded, so one event stays on one log line.
@@ -21,14 +21,14 @@ most once every 10 seconds per user:
 *   connection limits reached, for the whole daemon or for one user;
 *   rejected connections and version mismatches;
 *   handshake timeouts, transport errors and protocol violations;
-*   `peer process identity unavailable` (see below).
+*   `peer process identity unavailable` and `requested unmanaged device`
+    (see below).
 
 The next line of the same kind ends with, for example,
 `(12 similar lines not logged)`; if no later line of that kind comes, the
 count is not logged. The daemon-wide connection limit and connections
 rejected before the user is known are counted for all users together.
-Acquire, grant and release lines, and denials of queued or accepted
-requests, are never left out. Only the log is throttled: the client still
+Acquire, grant, release and `denied:` lines are never left out. Only the log is throttled: the client still
 gets its error every time. The line that is logged shows the uid, gid and
 pid of that connection only, not those of the lines left out.
 
@@ -51,9 +51,11 @@ uid=1001 gid=1001 pid=4300 denied: no GPU became available before the deadline
 
 `released its reservation` also ends a request that was cancelled while it
 waited. A request whose `-t` ran out normally ends with the `denied` line
-above. If the client disconnects at the same moment, the line can be replaced
-by a `transport error`. If a user waits well past `-t` and neither line
-appears, the daemon is probably stuck: restart it when the GPUs are idle.
+above, or with `released its reservation` if the client disconnected at the
+same moment. A client that disconnects before or right after the daemon
+replies is not an error: only the usual acquire, grant, denied or released
+lines appear, with no transport error. If a user waits well past `-t` and neither the
+`denied` nor the `released` line appears, the daemon is probably stuck: restart it when the GPUs are idle.
 Outside the journal, each line also starts with `gpudogd: access:` (see
 [Reading logs](#reading-logs)).
 
@@ -68,6 +70,14 @@ client; restart it with that flag (see
 [With Docker](daemon.md#with-docker-recommended)). A daemon on the host
 logs it only when a client exits right after connecting, which needs no
 action.
+
+Another request warning, `requested unmanaged device GPU-...`, means a
+request named a GPU that this daemon does not manage. The request's
+`denied: GPU-... is not managed by this daemon` line is always logged; the
+warning is limited as described in [Repeated warnings](#repeated-warnings).
+The user gets the same message; tell them which GPUs to use, for example
+the ones `gpudog dash` lists (see
+[`GPU-... is not managed by this daemon`](../troubleshooting.md#gpu-is-not-managed-by-this-daemon)).
 
 ## Reading logs
 
