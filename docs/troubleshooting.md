@@ -31,7 +31,9 @@ the stale socket file.
 
 The socket mode does not allow you to connect. Check `socket_mode` in the
 [configuration](administration/configuration.md) and the permissions of
-`/run/gpudog`.
+`/run/gpudog`. If the daemon logged `left mode ... from the umask on ...`, it created
+the socket directory under an unsafe parent with a restrictive umask:
+`sudo chmod 0755` the directory, or put the socket under `/run`.
 
 ## `... gpudogd did not answer within 10 seconds`
 

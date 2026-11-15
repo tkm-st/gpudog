@@ -42,12 +42,12 @@ unprivileged GPU-only permission.
 
 Start the daemon container first: its `-v` creates `/run/gpudog` on the host
 if it is missing, while the clients' `--mount` needs the directory to exist.
-With a rootless engine or user namespace remapping, create it with
-`sudo install -d -m 0755 /run/gpudog` before every start (`/run` is emptied
-at boot).
+If the engine does not create it (for example with user namespace remapping
+enabled), add `d /run/gpudog 0755 root root -` in `/etc/tmpfiles.d/gpudog.conf`,
+which recreates it at every boot.
 
 ```shell-session
-$ docker run -d --name gpudogd --userns=host --pid=host --network none --gpus all \
+$ docker run -d --name gpudogd --restart unless-stopped --userns=host --pid=host --network none --gpus all \
     -v /run/gpudog:/run/gpudog \
     gpudogd
 ```

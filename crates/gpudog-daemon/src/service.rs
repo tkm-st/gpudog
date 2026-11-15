@@ -801,18 +801,23 @@ impl Service {
         scheduler.set_observed_usage(observing, &[]);
         let path = config.socket_path.clone();
         let directory = socket_directory(&path);
-        let created = create_socket_directory(directory).map_err(StartError)?;
-        if created != Created::No {
-            log(
+        let shown = directory.display();
+        match create_socket_directory(directory).map_err(StartError)? {
+            Created::No => {}
+            Created::Yes => log(
                 LogLevel::Access,
-                &format!("created socket directory {}", directory.display()),
-            );
-        }
-        if let Created::ModeKept(reason) = created {
-            log(
-                LogLevel::Warning,
-                &format!("left the umask's mode on {}: {reason}", directory.display()),
-            );
+                &format!("created socket directory {shown}"),
+            ),
+            Created::ModeKept { mode, reason } => {
+                log(
+                    LogLevel::Access,
+                    &format!("created socket directory {shown}"),
+                );
+                log(
+                    LogLevel::Warning,
+                    &format!("left mode {mode:04o} from the umask on {shown}: {reason}"),
+                );
+            }
         }
         if config.require_secure_directory {
             if let Some(complaint) = directory_complaint(directory) {
@@ -1296,8 +1301,9 @@ fn create_socket_directory(directory: &Path) -> Result<Created, String> {
         Some(parent) if !parent.as_os_str().is_empty() => parent,
         _ => Path::new("."),
     };
-    if let Some(complaint) = directory_complaint(parent) {
-        return Ok(Created::ModeKept(complaint));
+    if let Some(reason) = directory_complaint(parent) {
+        let mode = std::fs::symlink_metadata(directory).map_err(failed)?.mode() & 0o7777;
+        return Ok(Created::ModeKept { mode, reason });
     }
     let flags = nix::fcntl::OFlag::O_DIRECTORY | nix::fcntl::OFlag::O_NOFOLLOW;
     let opened = std::fs::OpenOptions::new()
@@ -1315,15 +1321,15 @@ fn create_socket_directory(directory: &Path) -> Result<Created, String> {
 }
 
 /// What `create_socket_directory` did.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 enum Created {
     /// Something already existed at the path.
     No,
     /// Created with mode 0755.
     Yes,
-    /// Created, but left with the umask's mode because the parent fails
-    /// `directory_complaint` (the reason).
-    ModeKept(String),
+    /// Created, but left with the umask's `mode` because the parent fails
+    /// `directory_complaint` for `reason`.
+    ModeKept { mode: u32, reason: String },
 }
 
 /// Checks that `directory` is safe to hold the socket. Returns the reason it

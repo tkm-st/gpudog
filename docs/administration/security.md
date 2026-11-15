@@ -31,10 +31,11 @@ told it holds GPUs that are in use.
 When the directory is missing, the daemon creates it, owned by its own user
 with mode `0755`, and then checks it like any other. It creates only that
 directory, never its parents. If the parent fails the same check (as a
-shared directory such as `/tmp` does), the new directory keeps the mode the
-daemon's umask gives it instead, because someone else could have put
-another directory in its place, and the daemon logs a warning; with a umask stricter than `022`, clients
-then get `Permission denied`. `/run` passes the check.
+shared directory such as `/tmp` does), someone else could have put another
+directory in its place, so the new directory keeps the mode the daemon's
+umask gives it and the daemon logs a warning. With a umask such as `027` or
+`077`, clients then get `Permission denied`; with one such as `002`, the
+daemon refuses to start. `/run` passes the check.
 
 `require_secure_directory = false` and `--allow-insecure-socket-directory`
 turn this check off. Use them only for local testing.

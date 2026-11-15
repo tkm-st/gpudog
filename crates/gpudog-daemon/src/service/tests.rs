@@ -834,17 +834,39 @@ async fn start_creates_a_missing_socket_directory() {
     std::fs::remove_dir(&directory).unwrap();
 }
 
-#[test]
-fn a_directory_under_an_open_parent_keeps_the_umask_mode() {
+#[tokio::test]
+async fn a_directory_under_an_open_parent_keeps_the_umask_mode() {
     let parent = scratch_socket().with_extension("open-parent");
     std::fs::create_dir_all(&parent).unwrap();
     std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o777)).unwrap();
     let directory = parent.join("run");
-    match create_socket_directory(&directory).unwrap() {
-        Created::ModeKept(reason) => assert!(reason.contains("writable"), "{reason}"),
-        other => panic!("expected ModeKept, got {other:?}"),
-    }
-    assert!(directory.is_dir());
+    let lines = Arc::new(Mutex::new(Vec::new()));
+    let sink = {
+        let lines = lines.clone();
+        Arc::new(move |level: LogLevel, line: &str| {
+            lines.lock().unwrap().push((level, line.to_owned()));
+        })
+    };
+    let service = Service::start(
+        Arc::new(StaticInventory::with_count(1)),
+        None,
+        test_config(directory.join("s.sock")),
+        sink,
+    )
+    .unwrap();
+    let mode = std::fs::metadata(&directory).unwrap().mode() & 0o7777;
+    let warning = format!(
+        "left mode {mode:04o} from the umask on {}: ",
+        directory.display()
+    );
+    let lines = lines.lock().unwrap().clone();
+    assert!(
+        lines.iter().any(|(level, line)| *level == LogLevel::Warning
+            && line.starts_with(&warning)
+            && line.contains("writable by group or others")),
+        "{lines:?}"
+    );
+    drop(service);
     assert_eq!(create_socket_directory(&directory).unwrap(), Created::No);
     std::fs::remove_dir(&directory).unwrap();
     std::fs::remove_dir(&parent).unwrap();

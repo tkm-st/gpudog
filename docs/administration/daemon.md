@@ -19,7 +19,7 @@ What each flag is for:
 | `--gpus all` | The daemon must see every GPU it manages. A subset also works; see below. |
 | `--pid=host` | Gives the observer host PID/procfs visibility for process-tree identities. Clients keep their own PID namespaces. |
 | `--userns=host` | Keeps host UIDs on an engine with user namespace remapping enabled; without it, the daemon rejects clients whose UIDs have no mapping. It has no effect on an engine without remapping. |
-| `-v /run/gpudog:/run/gpudog` | Shares the socket with clients on the host. A rootful Docker engine without user namespace remapping creates the host directory, owned by root, if it is missing; otherwise create it with `sudo install -d -m 0755 /run/gpudog` before every start, since `/run` is emptied at boot. |
+| `-v /run/gpudog:/run/gpudog` | Shares the socket with clients on the host. A rootful Docker engine creates the host directory, owned by root, if it is missing. If yours does not (for example with user namespace remapping enabled), add `d /run/gpudog 0755 root root -` in `/etc/tmpfiles.d/gpudog.conf`, which recreates it at every boot. |
 | `-v /etc/gpudog:/etc/gpudog:ro` | Optional. Supplies `config.toml`; mount it read-only. The image has no `config.toml`, so without this mount the daemon uses the defaults and logs a warning at every start. |
 
 Do **not** use these flags:
@@ -91,9 +91,9 @@ At startup the daemon:
     (prefixed with `gpudogd: error:` outside the journal).
     Narrow its view with `CUDA_VISIBLE_DEVICES` (or Docker `--gpus`).
 4.  Creates the socket directory with mode `0755` if it is missing, and logs
-    `created socket directory <path>`. Under a parent that others can write
-    to, it keeps the mode the umask gives instead and warns
-    `left the umask's mode on <path>: ...`; see
+    `created socket directory <path>`. Under a parent that fails the same check
+    (for example one others can write to), it keeps the mode the umask gives instead and warns
+    `left mode <mode> from the umask on <path>: ...`; see
     [Security model](security.md#socket-directory). Only the socket directory itself is
     created: if its parent is missing too, startup fails with
     `cannot create <path>: No such file or directory` (prefixed with

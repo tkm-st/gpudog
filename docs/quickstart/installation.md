@@ -18,9 +18,10 @@ $ docker run -d --name gpudogd --restart unless-stopped --pid=host --userns=host
 
 !!! warning
     A rootful Docker engine creates `/run/gpudog` on the host, owned by
-    root with mode `0755`, whenever it is missing. With a rootless engine
-    or user namespace remapping, create it before every start instead (for
-    example with a `tmpfiles.d` entry). The directory must be owned by
+    root with mode `0755`, whenever it is missing. If your engine does
+    not (for example with user namespace remapping enabled), add the line
+    `d /run/gpudog 0755 root root -` in `/etc/tmpfiles.d/gpudog.conf`, which
+    recreates it at every boot. The directory must be owned by
     root and not writable by group or others. The daemon refuses to bind
     otherwise, because a socket directory that others can write to would
     let any user hijack the connection.

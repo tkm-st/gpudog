@@ -17,10 +17,11 @@ $ docker run -d --name gpudogd --restart unless-stopped --pid=host --userns=host
 
 `--restart unless-stopped` starts the daemon again after a reboot. A rootful
 Docker engine creates `/run/gpudog` on the host, owned by root with mode
-`0755`, whenever it is missing. With a rootless engine or user namespace remapping, create it before every
-start instead, for example with a `tmpfiles.d` entry, since `/run` is emptied
-at boot. The directory must be owned by
-root and must not be writable by group or others; the daemon refuses to
+`0755`, whenever it is missing. If your engine does not (for example with
+user namespace remapping enabled), add the line
+`d /run/gpudog 0755 root root -` in `/etc/tmpfiles.d/gpudog.conf`,
+which recreates it at every boot. The directory must be owned by root and
+must not be writable by group or others; the daemon refuses to
 start otherwise (see [Security model](administration/security.md)).
 
 On a machine without Docker, run the binary directly as root. It creates
