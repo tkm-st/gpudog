@@ -33,9 +33,12 @@ BLOCK_START = re.compile(
     r"|(-{3,}|={3,}|\*{3,}|_{3,})\s*$)"
 )
 
-# A line that nothing continues: a heading, a table row, HTML, a link
-# reference definition or a rule.
-SINGLE_LINE = re.compile(r"\s*(#|\||<|\[[^\]]+\]:|(-{3,}|={3,}|\*{3,}|_{3,})\s*$)")
+# A line that nothing continues: a heading, a table row (rows must start
+# with `|`), HTML, a link reference definition, a rule or a fence.
+SINGLE_LINE = re.compile(
+    r"\s*(#|\||<|\[[^\]]+\]:|```|~~~|(-{3,}|={3,}|\*{3,}|_{3,})\s*$)"
+)
+FENCE = re.compile(r"\s*(`{3,}|~{3,})(.*)$")
 
 
 def unwrap(text):
@@ -43,13 +46,21 @@ def unwrap(text):
     code, tables, HTML, reference definitions and hard breaks (two trailing
     spaces or a backslash) are left as they are."""
     out = []
-    fence = None
+    fence = None  # the opening run of backticks or tildes
     for line in text.splitlines():
-        marker = line.lstrip()[:3]
-        if marker in ("```", "~~~") and fence in (None, marker):
-            fence = None if fence else marker
-            out.append(line)
-            continue
+        found = FENCE.match(line)
+        if found:
+            run, rest = found.groups()
+            if fence is None:
+                fence = run
+                out.append(line)
+                continue
+            # Only a bare run of the same character, at least as long,
+            # closes the fence.
+            if run[0] == fence[0] and len(run) >= len(fence) and not rest.strip():
+                fence = None
+                out.append(line)
+                continue
         previous = out[-1] if out else ""
         joinable = (
             fence is None
