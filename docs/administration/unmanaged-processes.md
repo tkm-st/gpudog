@@ -47,8 +47,9 @@ feature. Longer intervals delay usage/release detection.
 
 A display server (Xorg, Xwayland or a Wayland compositor) keeps a process
 on the GPU it draws with for as long as it runs, so the daemon never grants
-that GPU. `gpudog dash` usually shows it as a `not managed` row on that
-GPU. A display server started by root counts as uid 0's; one started by a
+that GPU. `gpudog dash` shows it as a `not managed` row on that GPU, or as
+`unknown` if the daemon cannot read its process, for example in a container
+without `--pid=host`. A display server started by root counts as uid 0's; one started by a
 logged-in user counts as that user's, so that user always counts as using
 one GPU more and is served later in the queue.
 
