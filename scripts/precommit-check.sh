@@ -5,7 +5,7 @@
 # Verifies the staged index before a commit is created. Exits non-zero and
 # explains the fix when something unsafe is staged.
 #
-# Usage (after staging; the maintainer's commit hook also runs it):
+# Usage (after staging, or as a git hook; see "Git" in AGENTS.md):
 #   scripts/precommit-check.sh
 #
 set -uo pipefail
