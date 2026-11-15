@@ -216,9 +216,10 @@ $ nvidia-smi --query-gpu=index,uuid,compute_mode --format=csv
     GPU from several processes, keep CUDA in one of them, for example by
     doing no CUDA work in data loader workers. A program started without
     `gpudog` may also have taken the GPU first.
-*   `Prohibited` allows no process on the GPU.
+*   `Prohibited` allows no process on the GPU. Ask your administrator to
+    leave it out of GPUDog.
 
-If the mode is `Default`, or you need the GPU from several processes, ask your
+In any other case, or if you need the GPU from several processes, ask your
 administrator; see
 [GPU compute modes](administration/unmanaged-processes.md#gpu-compute-modes).
 

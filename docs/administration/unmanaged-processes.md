@@ -78,9 +78,9 @@ index, uuid, compute_mode
         workers that each use CUDA, fails in the second process with
         `CUDA-capable device(s) is/are busy or unavailable`.
     *   The same error reaches a job if a program started without `gpudog`
-        takes the GPU between the grant and the job's first CUDA call. In
-        return, such a program cannot share a GPU with a job that is
-        already using it.
+        takes the GPU between the grant and the job's first CUDA call.
+        Conversely, once a job is using a GPU, such a program cannot use it
+        either.
     *   `gpudog` and `gpudogd` themselves never take a GPU in this mode:
         they find GPUs without opening them through CUDA.
 *   `Prohibited` lets no process use the GPU through CUDA. The daemon still
