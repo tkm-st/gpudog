@@ -1174,8 +1174,8 @@ async fn observation_loop(shared: Arc<Shared>, source: Arc<dyn GpuProcessSource>
                         state.observation.completed = Some(Instant::now());
                         state.observation.error.clear();
                         let owners = busy_owners(&busy, &rows);
-                        // No process with a readable owner at all: almost
-                        // always a containerized daemon without --pid=host.
+                        // No process with a readable owner at all: usually a
+                        // containerized daemon without --pid=host, or WSL2.
                         // Busy GPUs then count as nobody's, so waiting on
                         // your own GPU holds up others; say so once.
                         let blind = !rows.is_empty() && rows.iter().all(|p| p.row.uid.is_none());

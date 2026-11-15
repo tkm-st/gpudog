@@ -33,7 +33,7 @@ The socket mode does not allow you to connect. Check `socket_mode` in the
 [configuration](administration/configuration.md) and the permissions of
 `/run/gpudog`. If the daemon logged `left mode ... from the umask on ...`, it created
 the socket directory under an unsafe parent with a restrictive umask:
-`sudo chmod 0755` the directory, or put the socket under `/run`.
+`sudo chmod 0755` the directory, or put the socket under `/run/gpudog`.
 
 ## `... gpudogd did not answer within 10 seconds`
 
@@ -59,7 +59,8 @@ in the queue, `gpudog run` waits as long as `--timeout` allows; see
 | -- | -- |
 | `... is writable by group or others, which would allow a local user to replace the socket` | `sudo chmod 0755 /run/gpudog` |
 | `... is owned by uid N, which is neither root nor this process` | `sudo chown root:root` the directory. |
-| `cannot create ...: No such file or directory` | The daemon creates the socket directory but not its parents. Create the parent, or use a socket path under an existing directory such as `/run`. |
+| `cannot create ...: No such file or directory` | The daemon creates the socket directory but not its parents. Create the parent, or use the default socket path under `/run/gpudog`. |
+| `cannot create ...: Read-only file system` or `cannot bind ...: Read-only file system` | The packaged unit lets the daemon write only in `/run/gpudog`. See [Without Docker](administration/daemon.md#without-docker) for a socket elsewhere. |
 | `another gpudogd is already listening on ...` | Only one daemon may run per socket. |
 | `... exists and is not a socket` | Remove the file at the socket path. |
 | Configuration ownership or mode errors | Make `config.toml` a regular file owned by root or the daemon's uid with mode `0644` or stricter. |

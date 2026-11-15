@@ -53,16 +53,28 @@ $ sudo gpudogd --socket /run/gpudog/gpudogd.sock
 
 The Debian package ships `gpudogd.service`, which creates `/run/gpudog`
 and starts the daemon. Read its logs with `journalctl -u gpudogd`. The unit
-sets `ProtectSystem=strict`, so the daemon can write only in `/run/gpudog`.
-For a `socket_path` in another directory, allow that directory in a
-drop-in, for example `/etc/systemd/system/gpudogd.service.d/socket.conf`:
+sets `ProtectSystem=strict`: apart from `/run/gpudog` (and `/dev`, `/proc`
+and `/sys`), the file system is read-only for the daemon, so it creates a
+missing socket directory only in `/run/gpudog`. To put the socket in another
+directory, for example `/srv/gpudog`:
 
-```ini
-[Service]
-ReadWritePaths=/srv/gpudog
-```
+1.  Create the directory, owned by root with mode `0755`:
+    `sudo install -d -m 0755 /srv/gpudog`. systemd refuses to start the unit
+    (status `226/NAMESPACE`) when the directory does not exist.
+2.  Set `socket_path = "/srv/gpudog/gpudogd.sock"` in `config.toml`.
+3.  Make only that directory writable, never a shared parent such as `/srv`
+    or `/tmp`, with `sudo systemctl edit gpudogd`:
 
-Then run `sudo systemctl daemon-reload` and `sudo systemctl restart gpudogd`.
+    ```ini
+    [Service]
+    ReadWritePaths=/srv/gpudog
+    ```
+
+4.  Run `sudo systemctl restart gpudogd`.
+
+Clients then need the same path, for example
+`gpudog run -s /srv/gpudog/gpudogd.sock -- ...` (`health` and `dash` take
+`-s` too).
 
 ## Command-line options
 

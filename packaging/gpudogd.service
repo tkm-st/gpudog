@@ -19,7 +19,7 @@ RuntimeDirectory=gpudog
 RuntimeDirectoryMode=0755
 # The daemon writes only its socket, so the file system is read-only for
 # it except the runtime directory above. A socket_path elsewhere needs
-# ReadWritePaths= for its directory in a drop-in.
+# ReadWritePaths= for its directory, created beforehand, in a drop-in.
 ProtectSystem=strict
 # Logs go to stderr; lines carry <N> syslog priorities for the journal.
 StandardError=journal
