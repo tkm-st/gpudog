@@ -808,6 +808,76 @@ fn a_bare_socket_name_is_checked_against_the_working_directory() {
 }
 
 #[tokio::test]
+async fn start_creates_a_missing_socket_directory() {
+    let directory = scratch_socket().with_extension("new");
+    let lines = Arc::new(Mutex::new(Vec::new()));
+    let sink = {
+        let lines = lines.clone();
+        Arc::new(move |_: LogLevel, line: &str| lines.lock().unwrap().push(line.to_owned()))
+    };
+    let config = ServiceConfig {
+        require_secure_directory: true,
+        ..test_config(directory.join("s.sock"))
+    };
+    let service =
+        Service::start(Arc::new(StaticInventory::with_count(1)), None, config, sink).unwrap();
+    let info = std::fs::symlink_metadata(&directory).unwrap();
+    assert!(info.is_dir());
+    assert_eq!(info.mode() & 0o7777, 0o755);
+    let created = format!("created socket directory {}", directory.display());
+    assert!(
+        lines.lock().unwrap().contains(&created),
+        "{:?}",
+        lines.lock().unwrap()
+    );
+    drop(service);
+    std::fs::remove_dir(&directory).unwrap();
+}
+
+#[tokio::test]
+async fn start_creates_only_the_last_directory() {
+    let parent = scratch_socket().with_extension("absent");
+    let error = Service::start(
+        Arc::new(StaticInventory::with_count(1)),
+        None,
+        test_config(parent.join("dir/s.sock")),
+        discard_log(),
+    )
+    .err()
+    .unwrap();
+    assert!(error.0.starts_with("cannot create "), "{error}");
+    assert!(error.0.ends_with("No such file or directory"), "{error}");
+    assert!(!parent.exists());
+}
+
+#[tokio::test]
+async fn start_leaves_a_socket_directory_symlink_to_the_check() {
+    let target = scratch_socket().with_extension("target");
+    std::fs::create_dir_all(&target).unwrap();
+    std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o777)).unwrap();
+    let link = scratch_socket().with_extension("link");
+    std::os::unix::fs::symlink(&target, &link).unwrap();
+    let config = ServiceConfig {
+        require_secure_directory: true,
+        ..test_config(link.join("s.sock"))
+    };
+    let error = Service::start(
+        Arc::new(StaticInventory::with_count(1)),
+        None,
+        config,
+        discard_log(),
+    )
+    .err()
+    .unwrap();
+    assert!(error.0.contains("writable by group or others"), "{error}");
+    // Not chmodded through the link.
+    let mode = std::fs::metadata(&target).unwrap().mode() & 0o777;
+    assert_eq!(mode, 0o777);
+    std::fs::remove_file(&link).unwrap();
+    std::fs::remove_dir(&target).unwrap();
+}
+
+#[tokio::test]
 async fn start_refuses_an_insecure_socket_directory() {
     let directory = scratch_socket().with_extension("open");
     std::fs::create_dir_all(&directory).unwrap();

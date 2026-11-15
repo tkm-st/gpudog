@@ -10,17 +10,19 @@ devices and that shares its socket directory with the host. Build the
 `gpudogd` image first; see [Installation](installation.md#daemon-docker-image).
 
 ```shell-session
-$ sudo mkdir -p /run/gpudog
 $ docker run -d --name gpudogd --pid=host --userns=host --gpus all \
     -v /run/gpudog:/run/gpudog \
     gpudogd
 ```
 
-`/run/gpudog` must be owned by root and must not be writable by group or
-others (`0755`). The daemon refuses to start otherwise; see
-[Security model](administration/security.md) for the reason.
+Docker creates `/run/gpudog` on the host if it is missing. It must be owned
+by root and must not be writable by group or others (`0755`). The daemon
+refuses to start otherwise; see [Security model](administration/security.md)
+for the reason.
 
-On a machine without Docker, run the binary directly as root:
+On a machine without Docker, run the binary directly as root. It creates
+`/run/gpudog` itself when the directory is missing, for example after a
+reboot:
 
 ```shell-session
 $ sudo gpudogd --socket /run/gpudog/gpudogd.sock

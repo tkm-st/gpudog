@@ -11,13 +11,13 @@ it with access to every GPU and the socket directory shared with the host:
 ```shell-session
 $ git checkout v0.0.1      # the release your clients come from
 $ docker build -t gpudogd .
-$ sudo mkdir -p /run/gpudog
 $ docker run -d --name gpudogd --pid=host --userns=host --gpus all \
     -v /run/gpudog:/run/gpudog \
     gpudogd
 ```
 
 !!! warning
+    Docker creates `/run/gpudog` on the host if it is missing.
     `/run/gpudog` must be owned by root with mode `0755`. The daemon refuses
     to bind otherwise, because a socket directory that others can write to
     would let any user hijack the connection.

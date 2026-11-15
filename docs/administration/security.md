@@ -28,6 +28,11 @@ user could write to it, they could delete the socket and put their own in its
 place. Every client would then talk to them instead of the daemon and could be
 told it holds GPUs that are in use.
 
+When the directory is missing, the daemon creates it, owned by its own user
+with mode `0755`, and then checks it like any other. It creates only that
+last directory, never its parents, and does not change the mode of anything
+it did not just create.
+
 `require_secure_directory = false` and `--allow-insecure-socket-directory`
 turn this check off. Use them only for local testing.
 

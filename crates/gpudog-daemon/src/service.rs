@@ -800,6 +800,15 @@ impl Service {
         let _ = scheduler.set_managed(&managed);
         scheduler.set_observed_usage(observing, &[]);
         let path = config.socket_path.clone();
+        if create_socket_directory(socket_directory(&path)).map_err(StartError)? {
+            log(
+                LogLevel::Access,
+                &format!(
+                    "created socket directory {}",
+                    socket_directory(&path).display()
+                ),
+            );
+        }
         if config.require_secure_directory {
             let directory = socket_directory(&path);
             if let Some(complaint) = directory_complaint(directory) {
@@ -1257,6 +1266,39 @@ fn socket_directory(socket_path: &Path) -> &Path {
         Some(parent) if !parent.as_os_str().is_empty() => parent,
         _ => Path::new("."),
     }
+}
+
+/// Creates the socket directory, mode 0755, when it does not exist, so a
+/// fresh `/run` (a tmpfs, empty after boot) needs no manual step. Only the
+/// last component is created: a missing parent stays an error. Returns
+/// whether it created the directory; the caller still checks it.
+fn create_socket_directory(directory: &Path) -> Result<bool, String> {
+    use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+    let shown = directory.display();
+    let failed = |error: io::Error| format!("cannot create {shown}: {}", errno_text(&error));
+    match std::fs::DirBuilder::new().mode(0o755).create(directory) {
+        Ok(()) => {}
+        // Whatever is there, a directory or not, is the check's business.
+        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => return Ok(false),
+        Err(error) => return Err(failed(error)),
+    }
+    // The umask may have removed bits clients need to reach the socket.
+    // Change the mode through a descriptor that refuses a symlink, so a
+    // path swapped in under a writable parent is never chmodded, and only
+    // when the directory is ours; anything else fails the check later.
+    let flags = nix::fcntl::OFlag::O_DIRECTORY | nix::fcntl::OFlag::O_NOFOLLOW;
+    let opened = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(flags.bits())
+        .open(directory)
+        .map_err(failed)?;
+    let euid = nix::unistd::geteuid().as_raw();
+    if opened.metadata().map_err(failed)?.uid() == euid {
+        opened
+            .set_permissions(std::fs::Permissions::from_mode(0o755))
+            .map_err(failed)?;
+    }
+    Ok(true)
 }
 
 /// Checks that `directory` is safe to hold the socket. Returns the reason it

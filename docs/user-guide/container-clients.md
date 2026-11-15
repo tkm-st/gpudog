@@ -40,14 +40,12 @@ unprivileged GPU-only permission.
 
 ## Start the daemon
 
-Create a root-owned socket directory before launching either container:
+Start the daemon container first. Docker creates `/run/gpudog` on the host,
+owned by root with mode `0755`, if it is missing:
 
 ```shell-session
-$ sudo mkdir -p /run/gpudog
-$ sudo chown root:root /run/gpudog
-$ sudo chmod 0755 /run/gpudog
 $ docker run -d --name gpudogd --userns=host --pid=host --network none --gpus all \
-    --mount type=bind,src=/run/gpudog,dst=/run/gpudog \
+    -v /run/gpudog:/run/gpudog \
     gpudogd
 ```
 
