@@ -158,8 +158,8 @@ includes only M devices managed here`.
 ## `daemon GPU N does not exist; this host has M GPUs`
 
 Requests name GPUs by CUDA number or UUID, never by daemon GPU number, so
-no current client should get this message. If you see it, report it with
-the command you ran and the daemon log.
+no current client should get this message. If you see it, report it to
+your administrator with the command you ran.
 
 ## `no GPUs are visible in this CUDA environment`
 

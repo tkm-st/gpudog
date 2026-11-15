@@ -139,4 +139,5 @@ count still includes it.
     number open (16 unless your administrator changed it): the dashboard
     shows `Cannot reach gpudogd: invalid request: too many concurrent
     connections for this user` (see [Troubleshooting](../troubleshooting.md))
-    and keeps retrying.
+    and keeps retrying. Stop a `gpudog` command you no longer need, or wait
+    for one to end.

@@ -18,11 +18,11 @@ every user with a process on it: it counts towards how many GPUs each such
 user already uses, which orders [the queue](../concepts.md#the-queue).
 Processes of root count as uid 0's.
 
-Whoever's it is, a request that cannot be met without GPUs busy outside
-GPUDog, or without GPUs its own user is using, keeps only those GPUs from
-the requests behind it: a process outside GPUDog may never end, and a
-user's own jobs should not keep GPUs idle that nobody is using (see
-[The queue](../concepts.md#the-queue)).
+Whoever owns such a process, a waiting request that needs a GPU busy
+outside GPUDog, or a GPU its own user is using, holds back only those GPUs
+from the requests queued behind it; they can still get the other GPUs. A
+process outside GPUDog may never end, and a user's own jobs should not keep
+GPUs idle that nobody is using (see [The queue](../concepts.md#the-queue)).
 
 If no observed process has a readable owner, as happens with a Docker
 daemon started without `--pid=host`, busy GPUs count as nobody's, and the daemon

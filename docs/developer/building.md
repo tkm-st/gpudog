@@ -189,7 +189,8 @@ publication, including the documentation site's GitHub Pages deploy on
 stable tags. Container-registry publication and server deployment are not
 configured.
 
-Run the release guard tests locally with `uv run scripts/test-actions.py`.
+Run the release guard tests locally with `uv run scripts/test-actions.py`
+(uv installs the PyYAML it needs).
 They execute the actual inline workflow scripts against temporary manifests
 and a mock `gh`, checking version mismatch, SemVer prereleases, draft retry,
 upload failure, refusal to overwrite a published release, and that the

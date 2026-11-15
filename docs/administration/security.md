@@ -102,8 +102,8 @@ above them. Anyone who can write to one of those directories, such as
 *   put a symlink in its place that points to another file owned by root,
     which passes the check because the daemon checks the file the symlink
     points to;
-*   replace the socket directory, so that clients reach their socket
-    instead of the daemon's.
+*   replace the socket directory, so that clients reach a socket they
+    control instead of the daemon's.
 
 Keep every directory on both paths owned by root and not writable by
 others. The Debian package and the default paths (`/etc/gpudog`,

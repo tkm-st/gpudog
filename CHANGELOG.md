@@ -13,12 +13,13 @@ under the release that makes it, and each release's notes include that
 release's section.
 
 *   Upgrade `gpudog` and `gpudogd` together, including client container
-    images. With the current handshake, a client and a daemon that speak
-    different protocol versions refuse each other with
-    `protocol version mismatch`: running jobs keep their GPUs, but new
+    images. A client and a daemon that speak different protocol versions
+    refuse each other with `protocol version mismatch`: running jobs keep
+    their GPUs, but new
     `gpudog` commands fail until both sides match.
 *   Read the changelog before upgrading. Restarting the daemon ends every
-    reservation; see
+    reservation and fails waiting requests; running commands keep running,
+    but their GPUs may then be given to others. See
     [Upgrading the package](https://github.com/tkm-st/gpudog/blob/main/docs/installation.md#upgrading-the-package)
     for when to restart.
 
