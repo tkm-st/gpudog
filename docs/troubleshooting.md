@@ -202,6 +202,14 @@ are idle (see [Shutdown](administration/daemon.md#shutdown)).
     [GPU numbers](concepts.md#gpu-numbers)). Use UUIDs to compare GPUs between
     environments.
 
+## `CUDA-capable device(s) is/are busy or unavailable`
+
+Your job got its GPUs, but CUDA refused them. This error comes from CUDA, not
+from GPUDog. The GPU is probably set to the `Exclusive_Process` or
+`Prohibited` compute mode, in which a job cannot use one GPU from several
+processes, or cannot use it at all. Ask your administrator; see
+[GPU compute modes](administration/unmanaged-processes.md#gpu-compute-modes).
+
 ## My GPUs were not released
 
 A reservation lasts as long as any process holds the connection, and child

@@ -58,6 +58,33 @@ move the display to another GPU. Researchers can still name the left-out GPU
 by its CUDA number and then get `GPU-... is not managed by this daemon`;
 tell them which GPUs to use, or set `CUDA_VISIBLE_DEVICES` for them.
 
+## GPU compute modes
+
+GPUDog expects every managed GPU in the `Default` compute mode, in which
+several processes may use a GPU at once. The daemon neither reads nor
+changes the compute mode. Check it with:
+
+```shell-session
+$ nvidia-smi --query-gpu=index,uuid,compute_mode --format=csv
+```
+
+*   `Exclusive_Process` lets only one process at a time use the GPU through
+    CUDA. GPUDog grants a GPU to the command and all its descendants, so a
+    job that uses one GPU from several processes, such as data loader
+    workers that each use CUDA, fails in the second process with
+    `CUDA-capable device(s) is/are busy or unavailable`. The same error
+    reaches a job if a program started without `gpudog` takes the GPU
+    between the grant and the job's first CUDA call. In return, programs
+    started without `gpudog` cannot share a GPU with a job that is already
+    using it. `gpudog` and `gpudogd` themselves never take the GPU in this
+    mode: they find GPUs without starting CUDA on them.
+*   `Prohibited` lets no process use the GPU through CUDA. The daemon still
+    grants such a GPU, and every job on it fails. Leave it out of `devices`
+    (see [Managing some GPUs](configuration.md#managing-some-gpus)).
+
+To go back to the default, run `sudo nvidia-smi -i <GPU> -c DEFAULT`, where
+`<GPU>` is the index or UUID that `nvidia-smi` shows.
+
 ## WSL2
 
 GPUDog cannot share GPUs safely under WSL2, because the daemon cannot see
