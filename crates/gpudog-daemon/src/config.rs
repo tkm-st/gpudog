@@ -148,7 +148,10 @@ impl Reader<'_> {
             }
         };
         if !(low..=high).contains(&value) {
-            self.warn(key, &format!("must be between {low} and {high}"));
+            // The message gives the documented range. Every integer key's
+            // minimum is 1: a 0 is let through here only so that `validate`
+            // can stop startup with its own "must be at least 1" error.
+            self.warn(key, &format!("must be between {} and {high}", low.max(1)));
             return None;
         }
         Some(value)

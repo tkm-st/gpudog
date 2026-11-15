@@ -101,6 +101,14 @@ fn normalise(result: &str) -> String {
         .collect()
 }
 
+/// The recorded loader gave the lower bound of a range warning as 0, the
+/// smallest value the setting can hold, although 0 stops startup. The
+/// loader now gives the documented minimum, 1. Only the recorded side is
+/// rewritten, so the rest of those cases is still compared in full.
+fn recorded_range(result: &str) -> String {
+    result.replace("': must be between 0 and ", "': must be between 1 and ")
+}
+
 #[test]
 fn loader_matches_the_recorded_results_on_every_case() {
     let inputs = cases(include_str!("golden/config_cases.txt"));
@@ -124,7 +132,10 @@ fn loader_matches_the_recorded_results_on_every_case() {
                 "--- {name}: log_directory set but no obsolete warning"
             ));
         }
-        let (actual, expected) = (normalise(&actual), normalise(&expected[name]));
+        let (actual, expected) = (
+            normalise(&actual),
+            recorded_range(&normalise(&expected[name])),
+        );
         let diverges = DIVERGENCES.iter().any(|(case, _)| case == name);
         if (actual == expected) == diverges {
             mismatches.push(format!(

@@ -103,9 +103,12 @@ async fn missing_cuda_symbols_prevent_startup_without_fallback() {
     let root = scratch();
     let mut command = daemon(&root, "");
     command.env("LD_LIBRARY_PATH", support::missing_uuid_directory());
-    assert!(refused(command)
-        .await
-        .contains("CUDA driver unavailable or missing required symbols"));
+    let stderr = refused(command).await;
+    assert!(
+        stderr.contains("CUDA driver unavailable or missing required symbols"),
+        "{stderr}"
+    );
+    assert!(!stderr.contains("panicked"), "{stderr}");
     assert!(!root.join("d.sock").exists());
     std::fs::remove_dir_all(&root).unwrap();
 }

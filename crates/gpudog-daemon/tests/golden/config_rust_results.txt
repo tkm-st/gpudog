@@ -14,7 +14,7 @@ value socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_direct
 warning ignoring 'max_queued_per_uid': expected an integer
 value socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
 === queued_out_of_range
-warning ignoring 'max_queued_per_uid': must be between 0 and 1000000
+warning ignoring 'max_queued_per_uid': must be between 1 and 1000000
 value socket_path=/run/gpudog/gpudogd.sock socket_mode=666 require_secure_directory=1 max_connections=256 max_connections_per_uid=16 handshake_timeout_ms=10000 max_held_per_uid=8 max_queued_per_uid=8
 === table_section
 warning ignoring unknown setting 'service'

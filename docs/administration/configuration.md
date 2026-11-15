@@ -35,8 +35,8 @@
 | `max_queued_per_uid` | integer (1–1,000,000) | `8` | Maximum requests one user may have waiting at once. |
 | `devices` | array of strings | all GPUs | GPUs this daemon manages, as `GPU-<uuid>` strings from `nvidia-smi -L`. See [Managing some GPUs](#managing-some-gpus). |
 
-A value of `0` for a limit stops startup. A value above the upper bound is
-ignored with a warning, and the default is used.
+A value of `0` for a limit stops startup. A negative value, or one above
+the upper bound, is ignored with a warning, and the default is used.
 
 ## Example
 

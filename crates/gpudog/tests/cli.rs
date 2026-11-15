@@ -788,6 +788,7 @@ async fn missing_cuda_symbols_do_not_panic_out_of_visibility_discovery() {
     assert!(result
         .stderr
         .contains("CUDA driver unavailable or missing required symbols"));
+    assert!(!result.stderr.contains("panicked"), "{}", result.stderr);
     assert_eq!(service.with_scheduler(Scheduler::free_device_count), 4);
 }
 

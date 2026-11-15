@@ -66,7 +66,7 @@ in the queue, `gpudog run` waits as long as `--timeout` allows; see
 | `no such configuration file: ...` | The file given with `--config` does not exist. |
 | `no configuration file at /etc/gpudog/config.toml; using the defaults` (warning) | Expected when you use the defaults. To silence it, create the file (an empty file is valid), or in Docker mount `/etc/gpudog` with `-v /etc/gpudog:/etc/gpudog:ro`. |
 | `max_connections must be at least 1` and similar | Fix the value in `config.toml`. See [Configuration](administration/configuration.md). |
-| `cannot enumerate GPUs: ...` | NVML is not available. Check `--gpus all` and the NVIDIA Container Toolkit. |
+| `cannot enumerate GPUs: ...` | The NVIDIA driver (CUDA or NVML) is not available. Check `--gpus all` and the NVIDIA Container Toolkit; see [CUDA driver or MIG inspection errors](#cuda-driver-or-mig-inspection-errors). |
 
 ## `configuration reload failed; keeping the previous configuration: ...`
 
@@ -178,9 +178,34 @@ requesting anything.
 cannot be loaded or lacks required functions. A missing NVML library is
 reported as `libnvidia-ml.so.1 not found; ...` instead. Both `gpudog run`
 and the daemon need the NVIDIA driver. Inside Docker, expose both `compute`
-and `utility` driver capabilities.
+and `utility` driver capabilities. If `nvidia-smi` works but the message
+says symbols are missing, the driver is probably too old: update it, or on
+a shared host ask your administrator.
 MIG instances and MIG-enabled visible GPUs are unsupported; an inability
 to inspect MIG state is an error, not a fallback to unchecked GPUs.
+
+## `failed to discover GPU vendor from CDI`
+
+```text
+docker: Error response from daemon: failed to discover GPU vendor from CDI: no known GPU vendor found
+```
+
+Docker could not give the container any GPU, so the program in the
+container (`gpudogd` or `gpudog`) did not start. `--gpus` on `docker run`,
+and `gpus:` in Docker Compose, need the NVIDIA Container Toolkit on the
+host, and it is missing or not set up for Docker. Older Docker versions
+report the same problem as
+`could not select device driver "" with capabilities: [[gpu]]`. If you are not the
+host's administrator, ask them to fix it. Install the
+toolkit and configure Docker for it as the
+[NVIDIA Container Toolkit installation guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+describes, then restart Docker (see also
+[Docker and local deployment](quickstart/environment.md#docker-and-local-deployment)).
+
+Docker still creates the daemon container. Remove it with
+`docker rm gpudogd` before you run the same `docker run --name gpudogd ...`
+again; otherwise Docker refuses because the name is in use. A client
+started with `--rm` needs nothing.
 
 ## `daemon granted device ... outside the requested CUDA view`
 

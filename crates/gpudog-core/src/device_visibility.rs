@@ -69,8 +69,8 @@ impl VisibleDevices {
         }
         // cudarc's lazy dynamic loader panics on unavailable libraries/symbols.
         // Contain that dependency failure; never fall back to NVML ordinals or
-        // unrestricted GPUs. The process's existing panic hook is not changed.
-        let uuids = std::panic::catch_unwind(cuda_uuids).map_err(|_| {
+        // unrestricted GPUs. The error below replaces cudarc's panic message.
+        let uuids = catch_cudarc_panic(cuda_uuids).map_err(|_| {
             VisibilityError("CUDA driver unavailable or missing required symbols".into())
         })??;
         if !uuids.is_empty() {
@@ -234,6 +234,61 @@ impl VisibleDevices {
         }
         Ok(())
     }
+}
+
+thread_local! {
+    /// Set while this thread runs `catch_cudarc_panic`.
+    static CATCHING_CUDARC: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Runs `f`, catching a panic, without printing the panic message when it
+/// is cudarc reporting a missing driver library or symbol: the caller turns
+/// it into a one-line error. Without this, the default hook prints cudarc's
+/// long message, which asks users to open a cudarc issue, before that error.
+///
+/// The hook is installed once and wraps the previous one. It drops a panic
+/// only if it was raised in cudarc's source, on a thread inside this
+/// function, with one of cudarc's two loader messages. Every other panic
+/// still reaches the previous hook: one from cudarc elsewhere, another
+/// cudarc panic here (a bug, not a missing driver), and a loader panic
+/// whose text a cudarc upgrade changed (the CLI and daemon tests catch
+/// that).
+fn catch_cudarc_panic<T>(f: impl FnOnce() -> T) -> std::thread::Result<T> {
+    static INSTALL: std::sync::Once = std::sync::Once::new();
+    INSTALL.call_once(|| {
+        let previous = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            let quiet = CATCHING_CUDARC.with(std::cell::Cell::get)
+                && info
+                    .location()
+                    .is_some_and(|location| is_cudarc_source(location.file()))
+                && info
+                    .payload()
+                    .downcast_ref::<String>()
+                    .is_some_and(|message| is_cudarc_loader_failure(message));
+            if !quiet {
+                previous(info);
+            }
+        }));
+    });
+    let outer = CATCHING_CUDARC.with(|flag| flag.replace(true));
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
+    CATCHING_CUDARC.with(|flag| flag.set(outer));
+    result
+}
+
+/// Whether a panic location names a file of the cudarc crate, such as
+/// `.../registry/src/index.crates.io-.../cudarc-0.19.10/src/lib.rs`.
+fn is_cudarc_source(file: &str) -> bool {
+    file.split(['/', '\\'])
+        .any(|part| part == "cudarc" || part.starts_with("cudarc-"))
+}
+
+/// Whether a panic message is cudarc's report of a library it cannot load
+/// (`Unable to dynamically load the "cuda" shared library ...`) or a
+/// symbol the library lacks (`Missing symbol cuDeviceGetUuid: ...`).
+fn is_cudarc_loader_failure(message: &str) -> bool {
+    message.starts_with("Unable to dynamically load ") || message.starts_with("Missing symbol ")
 }
 
 fn cuda_uuids() -> Result<Vec<String>, VisibilityError> {

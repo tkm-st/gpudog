@@ -131,3 +131,44 @@ fn grants_must_match_view_request_count_and_order() {
         )
         .is_err());
 }
+
+#[test]
+fn only_cudarc_source_files_count_as_cudarc_panics() {
+    for file in [
+        "/usr/local/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cudarc-0.19.10/src/lib.rs",
+        "/home/u/.cargo/registry/src/index.crates.io-x/cudarc-0.19.10/src/driver/sys/mod.rs",
+        "vendor/cudarc/src/lib.rs",
+        r"C:\cargo\registry\src\x\cudarc-0.19.10\src\lib.rs",
+    ] {
+        assert!(is_cudarc_source(file), "{file}");
+    }
+    for file in [
+        "crates/gpudog-core/src/device_visibility.rs",
+        "/registry/src/x/notcudarc-1.0.0/src/lib.rs",
+        "/registry/src/x/cudarc_extra/src/lib.rs",
+        "",
+    ] {
+        assert!(!is_cudarc_source(file), "{file}");
+    }
+}
+
+#[test]
+fn panics_outside_cudarc_are_still_caught() {
+    let caught = catch_cudarc_panic(|| -> u8 { panic!("not from cudarc") });
+    assert!(caught.is_err());
+    assert_eq!(catch_cudarc_panic(|| 7).unwrap(), 7);
+}
+
+#[test]
+fn only_cudarc_loader_messages_are_quiet() {
+    assert!(is_cudarc_loader_failure(
+        "Unable to dynamically load the \"cuda\" shared library - searched for library names: []"
+    ));
+    assert!(is_cudarc_loader_failure(
+        "Missing symbol cuDeviceGetUuid: dlsym failed"
+    ));
+    assert!(!is_cudarc_loader_failure(
+        "Unsupported target pointer width"
+    ));
+    assert!(!is_cudarc_loader_failure("index out of bounds"));
+}
