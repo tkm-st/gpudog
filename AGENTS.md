@@ -28,7 +28,7 @@ namespaces. `dash` consumes daemon metadata, and `--no-gpu-processes` hides
 rows only. `Dockerfile.release` and `scripts/release-check.py` build and
 validate x86-64 glibc 2.28 tar/deb artifacts; normal Bookworm/host builds do
 not guarantee that minimum. Debian 10 stages are build/test only. See
-`notes/device-identity.md`. Plans in the maintainer's local `tmp/` are not
+`notes/device-identity.md`. Plans kept in a local `tmp/` are scratch, not
 current code.
 
 Sources of truth: code, then `docs/` (Zensical; `zensical.toml`), then
@@ -235,11 +235,17 @@ the gates where it says `verifier`, with any directory under `tmp/` as
 ### Git
 
 *   Run `scripts/precommit-check.sh` after staging and before each commit
-    (the maintainer's commit hook runs it automatically). It refuses
+    (git runs it automatically once it is installed as the hook, below). It refuses
     gitlinks, build artifacts, large blobs, likely secrets and conflict
     markers, and runs `scripts/check-repo-text.py`. To run it on every
-    commit, link it as the hook:
+    commit, link it as the hook from the main checkout:
     `ln -s ../../scripts/precommit-check.sh .git/hooks/pre-commit`.
+    Linked worktrees, whose `.git` is a file, share that hook and run the
+    main checkout's copy of the script. If `core.hooksPath` is set, git
+    ignores `.git/hooks`: put the link in that directory or chain to it
+    from the hook there. As a hook it also refuses a commit that stages
+    nothing, such as `git commit --allow-empty` or an amend that only
+    rewords the message.
 *   Commit messages start with a gitmoji and use the imperative mood, for
     example `🐛 Release reservations when a session panics`. Common
     prefixes: ✨ feature, 🐛 fix, ♻️ refactor, 📝 docs, ✅ tests, 🔧 config
@@ -247,7 +253,8 @@ the gates where it says `verifier`, with any directory under `tmp/` as
     GitHub `tkm-st/gpudog`; use `gh` for it.
 *   Pull requests are written in English (see "Pull request language").
 *   The maintainer's agents have standing approval for the following steps after merging to `main`.
-    Other branches still need a request. A contributor's agent needs its own developer's request.
+    Other branches still need a request. A contributor's agent needs a
+    request from the contributor it works for.
     1.  Push `main` with `git push origin main`, fast-forward only. Never
         force-push; history rewrites still need their own approval. If the
         push is rejected as non-fast-forward, stop and ask; do not pull,
@@ -268,10 +275,11 @@ the gates where it says `verifier`, with any directory under `tmp/` as
 *   End users: researchers sharing GPUs, who run `gpudog run`, `dash` and
     `health`.
 *   Administrators who install and configure `gpudogd`.
-*   The developer, for agent-instruction changes.
+*   Contributors and the maintainer: the readers of `AGENTS.md`, `notes/`
+    and `docs/developer/`, and the users for instruction changes.
 *   User-facing material, for a review from a user's point of view: `docs/`, `README.md`,
     `packaging/` examples, `gpudog --help`, `gpudogd --help`, and built
-    binaries when the handoff gives their paths.
+    binaries when their paths are given.
 
 ### Docs map
 
@@ -325,21 +333,20 @@ the `scheduler` core are testable without a daemon, GPU or sockets.
 
 ### Extra human decisions
 
-Whatever tools you use, ask before any of the following: ask the person
-you work for, or, when you contribute on your own, the maintainer in the
-pull request:
+Whatever tools you use, ask before any of the following. Ask the person
+you work for or, when you contribute on your own, the maintainer in an
+issue or the pull request:
 
 *   a push, pull request or issue, an amend, rebase, reset or tag, or
     removing a worktree whose branch is not merged;
 *   a new or upgraded dependency, a toolchain pin or a CI change;
 *   a change in user-visible behaviour, CLI flags, config keys or defaults,
     or a wire or file format;
-*   a trust-boundary change;
-*   weakening a check or removing a hook.
-
-GPUDog adds:
-
-*   Wire-protocol layout, enum values, `PROTOCOL_VERSION` or golden fixtures.
+*   a trust-boundary change, or any Critical or High finding of a security
+    review;
+*   a change to this list, weakening a check or removing a hook;
+*   a change to the wire-protocol layout, enum values, `PROTOCOL_VERSION`
+    or golden fixtures.
 
 ### Improvement log
 
