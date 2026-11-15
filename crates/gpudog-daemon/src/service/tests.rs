@@ -2032,3 +2032,115 @@ async fn an_unreadable_procfs_is_not_reported_as_a_kernel_without_child_lists() 
         .iter()
         .any(|(_, message)| message.contains("does not list child processes")));
 }
+
+fn hold_limit_of(message: &Option<Message>) -> u64 {
+    match message {
+        Some(Message::Granted(granted)) => granted.hold_limit_ms,
+        other => panic!("expected a grant, got {other:?}"),
+    }
+}
+
+fn start_holding_for(gpus: u32, max_hold_ms: u64, log: LogSink) -> Service {
+    let config = ServiceConfig {
+        max_hold_ms,
+        ..test_config(scratch_socket())
+    };
+    Service::start(
+        Arc::new(StaticInventory::with_count(gpus)),
+        None,
+        config,
+        log,
+    )
+    .unwrap()
+}
+
+#[tokio::test]
+async fn a_grant_carries_the_hold_limit_and_the_dashboard_shows_it() {
+    let service = start_holding_for(2, 7_200_000, discard_log());
+    let mut holder = Client::ready(&service).await;
+    assert_eq!(hold_limit_of(&holder.acquire(want(1)).await), 7_200_000);
+    let mut waiter = Client::ready(&service).await;
+    assert!(is_queued(&waiter.acquire(want(2)).await));
+    let status = service.snapshot();
+    assert_eq!(status.holders[0].hold_limit_ms, 7_200_000);
+    // Not granted yet, so no limit is shown for it.
+    assert_eq!(status.waiting[0].hold_limit_ms, 0);
+    // A grant made later, when the holder leaves, carries the limit too.
+    drop(holder);
+    assert_eq!(hold_limit_of(&waiter.recv().await), 7_200_000);
+}
+
+#[tokio::test]
+async fn without_max_hold_ms_a_grant_has_no_hold_limit() {
+    let service = start(1);
+    let mut client = Client::ready(&service).await;
+    assert_eq!(hold_limit_of(&client.acquire(want(1)).await), 0);
+    assert_eq!(service.snapshot().holders[0].hold_limit_ms, 0);
+}
+
+#[tokio::test]
+async fn a_reload_changes_the_hold_limit_of_later_grants_only() {
+    let service = start(2);
+    let mut before = Client::ready(&service).await;
+    assert_eq!(hold_limit_of(&before.acquire(want(1)).await), 0);
+    let mut config = service.config();
+    config.max_hold_ms = 60_000;
+    service.reconfigure(&config, None).unwrap();
+    let mut after = Client::ready(&service).await;
+    assert_eq!(hold_limit_of(&after.acquire(want(1)).await), 60_000);
+    let mut limits: Vec<u64> = service
+        .snapshot()
+        .holders
+        .iter()
+        .map(|holder| holder.hold_limit_ms)
+        .collect();
+    limits.sort_unstable();
+    assert_eq!(limits, [0, 60_000]);
+}
+
+#[tokio::test]
+async fn a_reservation_past_its_hold_limit_is_logged_once_and_kept() {
+    let (sink, events) = recording_log();
+    let service = start_holding_for(1, 50, sink);
+    let mut client = Client::ready(&service).await;
+    assert_eq!(hold_limit_of(&client.acquire(want(1)).await), 50);
+    let overdue = || {
+        events
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(level, line)| {
+                *level == LogLevel::Access
+                    && line.contains("still holds its reservation after its hold limit of 50 ms")
+            })
+            .count()
+    };
+    eventually(|| overdue() == 1).await;
+    pause(200).await;
+    assert_eq!(overdue(), 1);
+    // Kept: nothing is revoked, and the client may still ping.
+    assert_eq!(service.with_scheduler(Scheduler::free_device_count), 0);
+    client.send(Message::Ping).await;
+    assert_eq!(client.recv().await, Some(Message::Pong));
+    let has = |text: &str| events.lock().unwrap().iter().any(|(_, l)| l.contains(text));
+    assert!(has(" hold_limit_ms=50"));
+    drop(client);
+    eventually(|| has("released its reservation")).await;
+    assert_eq!(service.with_scheduler(Scheduler::free_device_count), 1);
+}
+
+#[tokio::test]
+async fn a_holder_that_leaves_before_its_limit_is_not_reported_overdue() {
+    let (sink, events) = recording_log();
+    let service = start_holding_for(1, 100, sink);
+    let mut client = Client::ready(&service).await;
+    assert!(is_granted(&client.acquire(want(1)).await));
+    drop(client);
+    eventually(|| service.with_scheduler(Scheduler::free_device_count) == 1).await;
+    pause(250).await;
+    assert!(!events
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|(_, line)| line.contains("after its hold limit")));
+}

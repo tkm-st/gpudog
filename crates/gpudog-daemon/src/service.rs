@@ -223,6 +223,11 @@ struct SessionInfo {
     pid: i32,
     command: String,
     identity: Option<ProcessIdentity>,
+    /// `Granted::hold_limit_ms` this session was given; 0 until granted,
+    /// and 0 for no limit.
+    hold_limit_ms: u64,
+    /// When the hold limit ends, for the one log line that says so.
+    hold_deadline: Option<Instant>,
 }
 
 #[derive(Default)]
@@ -251,9 +256,18 @@ struct Observation {
 /// the devices in between.
 #[derive(Debug, Clone)]
 enum Reply {
-    Granted { gpus: Vec<u32>, uuids: Vec<String> },
-    Queued { position: u32 },
-    Denied { reason: DenyReason, detail: String },
+    Granted {
+        gpus: Vec<u32>,
+        uuids: Vec<String>,
+        hold_limit_ms: u64,
+    },
+    Queued {
+        position: u32,
+    },
+    Denied {
+        reason: DenyReason,
+        detail: String,
+    },
 }
 
 /// How a reload changed the managed devices, by UUID.
@@ -330,6 +344,7 @@ impl State {
             receiver
         });
         let reply = self.reply(outcome);
+        self.record_grant(request.id, &reply, now);
         // The submit's walk may have granted or expired other requests;
         // their outcomes wait in the scheduler until this pump reports them.
         // If this request queued, its waiter is already registered.
@@ -346,6 +361,7 @@ impl State {
             for transition in self.scheduler.tick(now) {
                 let granted = matches!(transition.outcome, ReservationOutcome::Granted { .. });
                 let reply = self.reply(transition.outcome);
+                self.record_grant(transition.id, &reply, now);
                 let delivered = self
                     .waiters
                     .remove(&transition.id)
@@ -429,7 +445,13 @@ impl State {
                     })
                     .collect();
                 match named {
-                    Some((gpus, uuids)) => Reply::Granted { gpus, uuids },
+                    // Read here, under the lock that granted, so a reload
+                    // applies to later grants only.
+                    Some((gpus, uuids)) => Reply::Granted {
+                        gpus,
+                        uuids,
+                        hold_limit_ms: self.config.max_hold_ms,
+                    },
                     None => Reply::Denied {
                         reason: DenyReason::INTERNAL_ERROR,
                         detail: "granted GPU has no UUID".into(),
@@ -438,6 +460,20 @@ impl State {
             }
             ReservationOutcome::Queued { position } => Reply::Queued { position },
             ReservationOutcome::Denied { reason, detail } => Reply::Denied { reason, detail },
+        }
+    }
+
+    /// Keeps the hold limit a grant carries with its session, for the
+    /// dashboard and the overdue log line. `now` is the time of the grant.
+    fn record_grant(&mut self, id: RequestId, reply: &Reply, now: Instant) {
+        let Reply::Granted { hold_limit_ms, .. } = *reply else {
+            return;
+        };
+        if let Some(session) = self.sessions.get_mut(&id) {
+            session.hold_limit_ms = hold_limit_ms;
+            // Bounded by `MAX_HOLD_LIMIT_MS`, so this cannot overflow.
+            session.hold_deadline =
+                (hold_limit_ms > 0).then(|| now + Duration::from_millis(hold_limit_ms));
         }
     }
 
@@ -595,10 +631,14 @@ fn denied(reason: DenyReason, detail: impl Into<String>) -> Denied {
 
 fn to_message(reply: Reply) -> Message {
     match reply {
-        Reply::Granted { gpus, uuids } => Granted {
+        Reply::Granted {
             gpus,
             uuids,
-            hold_limit_ms: 0,
+            hold_limit_ms,
+        } => Granted {
+            gpus,
+            uuids,
+            hold_limit_ms,
         }
         .into(),
         Reply::Queued { position } => Queued { position }.into(),
@@ -1736,6 +1776,8 @@ async fn handle_acquire(
                 pid: peer.pid,
                 command,
                 identity,
+                hold_limit_ms: 0,
+                hold_deadline: None,
             },
         );
         state.submit(&submission, now)
@@ -1766,11 +1808,20 @@ async fn handle_acquire(
         Reply::Denied { detail, .. } => {
             shared.log(LogLevel::Access, &format!("{peer} denied: {detail}"));
         }
-        Reply::Granted { gpus, uuids } => {
+        Reply::Granted {
+            gpus,
+            uuids,
+            hold_limit_ms,
+        } => {
+            let limit_note = if *hold_limit_ms > 0 {
+                format!(" hold_limit_ms={hold_limit_ms}")
+            } else {
+                String::new()
+            };
             shared.log(
                 LogLevel::Access,
                 &format!(
-                    "{peer} granted gpus=[{}]",
+                    "{peer} granted gpus=[{}]{limit_note}",
                     gpus.iter()
                         .zip(uuids)
                         .map(|(number, uuid)| format!("{number}:{uuid}"))
@@ -1786,10 +1837,41 @@ async fn handle_acquire(
     if granted {
         // Hold the reservation until the client's fd closes. The fd *is*
         // the lock.
-        await_peer_close(line).await
+        let deadline = shared
+            .lock()
+            .sessions
+            .get(&id)
+            .and_then(|session| session.hold_deadline.map(|at| (at, session.hold_limit_ms)));
+        hold(shared, line, peer, deadline).await
     } else {
         Ok(())
     }
+}
+
+/// [`await_peer_close`] for a holder. When its hold limit ends, logs once
+/// that it has, and keeps holding: the client stops its command, and the
+/// daemon never revokes a reservation.
+async fn hold(
+    shared: &Shared,
+    line: &mut Line,
+    peer: &PeerCredentials,
+    deadline: Option<(Instant, u64)>,
+) -> Result<(), SessionError> {
+    let closed = await_peer_close(line);
+    tokio::pin!(closed);
+    if let Some((at, limit_ms)) = deadline {
+        tokio::select! {
+            result = &mut closed => return result,
+            () = tokio::time::sleep_until(at.into()) => shared.log(
+                LogLevel::Access,
+                &format!(
+                    "{peer} still holds its reservation after its hold limit of {limit_ms} ms; \
+                     it is kept until the client closes it"
+                ),
+            ),
+        }
+    }
+    closed.await
 }
 
 /// Reads until the peer goes away, answering pings. A client holding or
@@ -1903,7 +1985,7 @@ fn snapshot(shared: &Shared) -> StatusReply {
                 num_gpus: entry.num_gpus,
                 age_ms: u64::try_from(now.saturating_duration_since(entry.since).as_millis())
                     .unwrap_or(u64::MAX),
-                hold_limit_ms: 0,
+                hold_limit_ms: session.map_or(0, |s| s.hold_limit_ms),
                 position: entry.position,
                 command: command.into_bytes(),
             };
