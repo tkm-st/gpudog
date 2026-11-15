@@ -141,7 +141,8 @@ Before publishing (steps 1 to 3 are needed once per repository):
     `## [<version>] - YYYY-MM-DD`, and check that it lists every change to
     the protocol, configuration, command-line options, messages and log
     lines. The release notes are this section and the `Compatibility`
-    section (`scripts/release-notes.py`); the release workflow stops if the
+    section (`scripts/release-notes.py`, which joins wrapped lines because
+    GitHub shows each line break of a release body); the release workflow stops if the
     version has no dated section. A prerelease such as `0.0.2-rc.1` may use
     the `0.0.2` section while it is still `Unreleased`, and its release
     page then shows that heading. After a release, add

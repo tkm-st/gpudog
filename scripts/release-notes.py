@@ -2,8 +2,10 @@
 """Print the GitHub release notes for VERSION from CHANGELOG.md.
 
 The notes are the changelog's Compatibility section, the section for the
-version, and a fixed note on what the release checks did not cover. A
-release fails here rather than publish notes that list nothing:
+version, and a fixed note on what the release checks did not cover. GitHub
+shows every line break in a release body, so the lines of each paragraph
+and list item are joined. A release fails here rather than publish notes
+that list nothing:
 
 *   A release needs a `## [VERSION] - YYYY-MM-DD` section.
 *   A prerelease (`X.Y.Z-rc.1`) may instead use the section of X.Y.Z, even
@@ -21,6 +23,36 @@ FOOTER = (
     "[Installing from a GitHub release](https://github.com/tkm-st/gpudog/blob/main/docs/installation.md#from-a-github-release) "
     "for how to check and install these files."
 )
+
+
+# A line that starts its own block: a heading, a list item, a table row, a
+# quote, a rule or a fence. Anything else continues the line above it.
+BLOCK_START = re.compile(r"\s*(#|[*+-]\s|\d+[.)]\s|\||>|---|```|~~~)")
+
+
+def unwrap(text):
+    """Joins the hard-wrapped lines of paragraphs and list items. Fenced
+    code, tables and blank lines are left as they are."""
+    out = []
+    fenced = False
+    for line in text.splitlines():
+        if line.lstrip().startswith(("```", "~~~")):
+            fenced = not fenced
+            out.append(line)
+            continue
+        joinable = (
+            not fenced
+            and out
+            and out[-1].strip()
+            and line.strip()
+            and not BLOCK_START.match(line)
+            and not out[-1].lstrip().startswith(("#", "|", "```", "~~~"))
+        )
+        if joinable:
+            out[-1] = out[-1].rstrip() + " " + line.strip()
+        else:
+            out.append(line)
+    return "\n".join(out)
 
 
 def sections(text):
@@ -66,7 +98,7 @@ def notes(text, version):
     if not body:
         raise SystemExit("CHANGELOG.md section '{}' is empty".format(heading))
     return "## Compatibility\n\n{}\n\n## {}\n\n{}\n\n---\n\n{}\n".format(
-        compatibility, heading, body, FOOTER
+        unwrap(compatibility), heading, unwrap(body), FOOTER
     )
 
 

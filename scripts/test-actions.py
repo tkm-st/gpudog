@@ -182,6 +182,18 @@ class ReleaseNotesTests(unittest.TestCase):
         self.assertNotIn('Next.', notes)
         self.assertIn('this is not real GPU validation', notes)
 
+    def test_wrapped_lines_are_joined_because_github_keeps_line_breaks(self):
+        wrapped = CHANGELOG.replace('No promise.', 'No\npromise.').replace(
+            '*   First.',
+            '*   First,\n    wrapped.\n    *   Nested\n        item.\n\n'
+            '```shell\nkeep\nthese\n```\n\n| a |\n| b |')
+        result, notes = self.run_notes('v0.1.0', wrapped)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('## Compatibility\n\nNo promise.\n', notes)
+        self.assertIn('*   First, wrapped.\n    *   Nested item.\n', notes)
+        self.assertIn('```shell\nkeep\nthese\n```', notes)
+        self.assertIn('| a |\n| b |', notes)
+
     def test_an_unreleased_version_stops_the_release(self):
         result, _ = self.run_notes('v0.2.0')
         self.assertNotEqual(result.returncode, 0)
