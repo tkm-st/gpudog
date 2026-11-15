@@ -121,7 +121,11 @@ waiting. Only the daemon shares the host PID namespace. See
 ## Docker Compose
 
 `packaging/compose.yaml` provides the daemon and an opt-in client profile.
-The `gpus` key needs Docker Compose >= 2.30. Export the paths and caller IDs:
+The `gpus` key needs Docker Compose >= 2.30. Its binds do not create a
+missing host directory, so make sure the socket directory exists at every
+boot, for example with `d /run/gpudog 0755 root root -` in
+`/etc/tmpfiles.d/gpudog.conf` (apply it now with
+`sudo systemd-tmpfiles --create`). Export the paths and caller IDs:
 
 ```shell-session
 $ export GPUDOG_UID="$(id -u)"

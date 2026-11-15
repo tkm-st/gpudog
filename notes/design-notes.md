@@ -172,9 +172,12 @@ relies on a few cargo-deb behaviours that are easy to break.
     `the_packaged_template_changes_nothing_...` keeps its commented values
     equal to the defaults.
 *   `packaging/gpudogd.service` uses `RuntimeDirectory=gpudog` (root,
-    0755), which passes `directory_complaint`. A `socket_path` outside
-    `/run/gpudog` needs its directory created with safe permissions by the
-    operator. Hardening options (`ProtectSystem=` and so on) are not added
+    0755), which passes `directory_complaint`. Elsewhere `gpudogd` creates
+    a missing socket directory itself (`create_socket_directory`: last
+    component only, 0755 restored only under a parent that passes
+    `directory_complaint`). The operator still creates a missing parent, and
+    the host directory behind a bind that does not create it (Compose long
+    syntax). Hardening options (`ProtectSystem=` and so on) are not added
     yet; they need checking against NVML on a GPU host.
 
 ### Development
