@@ -239,7 +239,7 @@ dependencies = [
 
 [[package]]
 name = "gpudog"
-version = "0.0.1"
+version = "0.0.1-rc.1"
 dependencies = [
  "clap",
  "gpudog-client",
@@ -252,7 +252,7 @@ dependencies = [
 
 [[package]]
 name = "gpudog-client"
-version = "0.0.1"
+version = "0.0.1-rc.1"
 dependencies = [
  "futures-util",
  "gpudog-core",
@@ -265,7 +265,7 @@ dependencies = [
 
 [[package]]
 name = "gpudog-core"
-version = "0.0.1"
+version = "0.0.1-rc.1"
 dependencies = [
  "bytes",
  "cudarc",
@@ -277,7 +277,7 @@ dependencies = [
 
 [[package]]
 name = "gpudog-daemon"
-version = "0.0.1"
+version = "0.0.1-rc.1"
 dependencies = [
  "futures-util",
  "gpudog-core",
@@ -291,7 +291,7 @@ dependencies = [
 
 [[package]]
 name = "gpudogd"
-version = "0.0.1"
+version = "0.0.1-rc.1"
 dependencies = [
  "clap",
  "futures-util",
