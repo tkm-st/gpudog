@@ -44,7 +44,8 @@ FENCE = re.compile(r"\s*(`{3,}|~{3,})(.*)$")
 def unwrap(text):
     """Joins the hard-wrapped lines of paragraphs and list items. Fenced
     code, tables, HTML, reference definitions and hard breaks (two trailing
-    spaces or a backslash) are left as they are."""
+    spaces or a backslash) are left as they are; indented code blocks are
+    not recognised, so use fences."""
     out = []
     fence = None  # the opening run of backticks or tildes
     for line in text.splitlines():
@@ -71,7 +72,7 @@ def unwrap(text):
             and not previous.endswith(("  ", "\\"))
         )
         if joinable:
-            out[-1] = out[-1].rstrip() + " " + line.strip()
+            out[-1] = out[-1].rstrip() + " " + line.lstrip()
         else:
             out.append(line)
     return "\n".join(out)

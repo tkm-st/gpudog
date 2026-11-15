@@ -198,9 +198,11 @@ class ReleaseNotesTests(unittest.TestCase):
         kept = ('Break  \nhere.\n\n<!-- note -->\ntext\n\n'
                 '[a]: https://example.com/a\n[b]: https://example.com/b\n\n'
                 '```\n~~~\none\ntwo\n```rust\nthree\n```\nafter the fence')
-        result, notes = self.run_notes('v0.1.0', CHANGELOG.replace('*   First.', kept))
+        result, notes = self.run_notes(
+            'v0.1.0', CHANGELOG.replace('*   First.', kept + '\n\nJoined\nthen  \nbroken.'))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(kept, notes)
+        self.assertIn('Joined then  \nbroken.', notes)
 
     def test_an_unreleased_version_stops_the_release(self):
         result, _ = self.run_notes('v0.2.0')
