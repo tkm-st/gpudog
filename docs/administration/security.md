@@ -29,13 +29,17 @@ place. Every client would then talk to them instead of the daemon and could be
 told it holds GPUs that are in use.
 
 When the directory is missing, the daemon creates it, owned by its own user
-with mode `0755`, and then checks it like any other. It creates only that
-directory, never its parents. If the parent fails the same check (as a
-shared directory such as `/tmp` does), someone else could have put another
-directory in its place, so the new directory keeps the mode the daemon's
-umask gives it and the daemon logs a warning. With a umask such as `027` or
-`077`, clients then get `Permission denied`; with one such as `002`, the
-daemon refuses to start. `/run` passes the check.
+with mode `0755` whatever its umask, and then checks it like any other. It
+creates only that directory, never its parents. If the parent fails the
+same check (as a shared directory such as `/tmp` does), the daemon does not
+adjust the new directory's mode, because someone else could have swapped
+the directory for one of their own. The directory then gets `0755` less
+the bits the daemon's umask removes, and the daemon logs a warning about
+the parent. With a umask such as `077`, clients then get
+`Permission denied`, and with `027` so do clients outside the daemon's
+group; one such as `022` or `002` leaves `0755`. `/run` passes the check.
+See [Troubleshooting](../troubleshooting.md#permission-denied) for the
+fix.
 
 `require_secure_directory = false` and `--allow-insecure-socket-directory`
 turn this check off. Use them only for local testing.

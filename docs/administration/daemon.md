@@ -92,7 +92,8 @@ At startup the daemon:
     Narrow its view with `CUDA_VISIBLE_DEVICES` (or Docker `--gpus`).
 4.  Creates the socket directory with mode `0755` if it is missing, and logs
     `created socket directory <path>`. Under a parent that fails the same check
-    (for example one others can write to), it keeps the mode the umask gives instead and warns
+    (for example one others can write to), it leaves the mode as the daemon's umask
+    makes it (`0755` less the umask's bits) and warns
     `left mode <mode> from the umask on <path>: ...`; see
     [Security model](security.md#socket-directory). Only the socket directory itself is
     created: if its parent is missing too, startup fails with

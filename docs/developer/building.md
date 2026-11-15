@@ -66,11 +66,15 @@ a green unit suite alone is not a real GPU/container verification.
 
 ```shell-session
 $ mkdir -p tmp/run && chmod 0755 tmp/run
-$ printf '' > tmp/run/config.toml
+$ printf '' > tmp/run/config.toml && chmod 0644 tmp/run/config.toml
 $ target/debug/gpudogd --num-gpus 2 \
     --config tmp/run/config.toml --socket tmp/run/gpudogd.sock &
 $ target/debug/gpudog health -s tmp/run/gpudogd.sock
 ```
+
+The `chmod` calls matter under a umask such as `002`, the default for
+users on Ubuntu: the daemon refuses a configuration file or socket
+directory that group or others can write.
 
 Logs go to stderr, not a log directory. The override fabricates UUIDs, so it
 is useful for wire/service tests; a production `run` still needs its real
