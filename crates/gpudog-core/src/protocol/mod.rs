@@ -46,7 +46,9 @@ mod tests;
 /// canonical bool/option discriminators (0 or 1).
 /// v6 removes the client-chosen priority from `Acquire` and
 /// `ReservationInfo`: the daemon orders its queue itself.
-pub const PROTOCOL_VERSION: u32 = 6;
+/// v7 adds `hold_limit_ms` to `Granted` and `ReservationInfo`: how long the
+/// daemon's `max_hold_ms` lets the reservation be held.
+pub const PROTOCOL_VERSION: u32 = 7;
 
 /// Size of the little-endian length prefix that precedes every frame body.
 pub const LENGTH_PREFIX_SIZE: usize = 4;
@@ -77,6 +79,10 @@ pub const MAX_STATUS_ENTRIES: u32 = 256;
 /// Upper bound on `Acquire::timeout_ms` (~49.7 days), so the daemon can add it
 /// to a monotonic clock without overflow.
 pub const MAX_TIMEOUT_MS: u64 = 0xFFFF_FFFF;
+
+/// Upper bound on `Granted::hold_limit_ms` and `ReservationInfo::hold_limit_ms`,
+/// for the same reason as [`MAX_TIMEOUT_MS`].
+pub const MAX_HOLD_LIMIT_MS: u64 = MAX_TIMEOUT_MS;
 
 /// Discriminator stored in the first two bytes of a frame body.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -258,6 +264,10 @@ pub struct Granted {
     /// `uuids[i]` names `gpus[i]`. These, not the indices, go into
     /// `CUDA_VISIBLE_DEVICES`.
     pub uuids: Vec<String>,
+    /// Milliseconds the client may hold the reservation, counted from the
+    /// grant; 0 means no limit. The client stops its command when it ends;
+    /// the daemon never revokes the reservation.
+    pub hold_limit_ms: u64,
 }
 
 /// Terminal failure for a request.
@@ -290,6 +300,9 @@ pub struct ReservationInfo {
     pub num_gpus: u32,
     /// Milliseconds since the reservation was granted or queued.
     pub age_ms: u64,
+    /// `Granted::hold_limit_ms` given to this holder; 0 means no limit, and
+    /// it is always 0 for a waiting request.
+    pub hold_limit_ms: u64,
     /// Queue position; always 0 for a holder.
     pub position: u32,
     /// `Acquire::command`, echoed verbatim. Untrusted text.
@@ -529,6 +542,9 @@ fn validate_granted(msg: &Granted) -> Result<(), ProtocolError> {
     if msg.uuids.len() != msg.gpus.len() {
         return Err(ProtocolError::InvalidMessage);
     }
+    if msg.hold_limit_ms > MAX_HOLD_LIMIT_MS {
+        return Err(ProtocolError::ValueOutOfRange);
+    }
     validate_gpu_list(&msg.gpus)?;
     validate_uuid_list(&msg.uuids)
 }
@@ -544,7 +560,10 @@ fn validate_denied(msg: &Denied) -> Result<(), ProtocolError> {
 /// overruns the dashboard's limits.
 fn validate_reservation(info: &ReservationInfo) -> Result<(), ProtocolError> {
     validate_gpu_list(&info.gpus)?;
-    if info.num_gpus > MAX_GPU_COUNT || exceeds(info.command.len(), MAX_COMMAND_SIZE) {
+    if info.num_gpus > MAX_GPU_COUNT
+        || info.hold_limit_ms > MAX_HOLD_LIMIT_MS
+        || exceeds(info.command.len(), MAX_COMMAND_SIZE)
+    {
         return Err(ProtocolError::ValueOutOfRange);
     }
     Ok(())
@@ -655,6 +674,7 @@ impl Writer {
         self.gpu_list(&info.gpus);
         self.u32(info.num_gpus);
         self.u64(info.age_ms);
+        self.u64(info.hold_limit_ms);
         self.u32(info.position);
         self.bytes(&info.command);
     }
@@ -687,6 +707,7 @@ pub fn encode(msg: &Message) -> Result<Vec<u8>, ProtocolError> {
             validate_granted(value)?;
             w.gpu_list(&value.gpus);
             w.uuid_list(&value.uuids);
+            w.u64(value.hold_limit_ms);
         }
         Message::Denied(value) => {
             validate_denied(value)?;
@@ -857,7 +878,7 @@ impl<'a> Reader<'a> {
 
     fn reservations(&mut self) -> Result<Vec<ReservationInfo>, ProtocolError> {
         /// The fixed fields plus two empty length prefixes.
-        const MIN_RESERVATION_BYTES: usize = 8 + 4 + 4 + 4 + 4 + 8 + 4 + 4;
+        const MIN_RESERVATION_BYTES: usize = 8 + 4 + 4 + 4 + 4 + 8 + 8 + 4 + 4;
         let count = self.count(MAX_STATUS_ENTRIES, MIN_RESERVATION_BYTES)?;
         (0..count)
             .map(|_| {
@@ -868,6 +889,7 @@ impl<'a> Reader<'a> {
                     gpus: self.gpu_list()?,
                     num_gpus: self.u32()?,
                     age_ms: self.u64()?,
+                    hold_limit_ms: self.u64()?,
                     position: self.u32()?,
                     command: self.bytes()?,
                 })
@@ -963,6 +985,7 @@ pub fn decode_body(buffer: &[u8]) -> Result<Message, ProtocolError> {
             let value = Granted {
                 gpus: r.gpu_list()?,
                 uuids: r.uuid_list()?,
+                hold_limit_ms: r.u64()?,
             };
             validate_granted(&value)?;
             Message::Granted(value)

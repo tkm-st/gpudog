@@ -590,7 +590,12 @@ fn denied(reason: DenyReason, detail: impl Into<String>) -> Denied {
 
 fn to_message(reply: Reply) -> Message {
     match reply {
-        Reply::Granted { gpus, uuids } => Granted { gpus, uuids }.into(),
+        Reply::Granted { gpus, uuids } => Granted {
+            gpus,
+            uuids,
+            hold_limit_ms: 0,
+        }
+        .into(),
         Reply::Queued { position } => Queued { position }.into(),
         Reply::Denied { reason, detail } => denied(reason, detail).into(),
     }
@@ -1877,7 +1882,7 @@ fn snapshot(shared: &Shared) -> StatusReply {
             let command = session.map(|s| s.command.clone()).unwrap_or_default();
             // Fixed fields, the device list, and the command; matches the
             // reservation encoding in `protocol`.
-            let cost = 40 + entry.gpus.len() * 4 + command.len();
+            let cost = 48 + entry.gpus.len() * 4 + command.len();
             if cost > budget {
                 reply.truncated = true;
                 return false;
@@ -1891,6 +1896,7 @@ fn snapshot(shared: &Shared) -> StatusReply {
                 num_gpus: entry.num_gpus,
                 age_ms: u64::try_from(now.saturating_duration_since(entry.since).as_millis())
                     .unwrap_or(u64::MAX),
+                hold_limit_ms: 0,
                 position: entry.position,
                 command: command.into_bytes(),
             };

@@ -229,14 +229,14 @@ $ python3 scripts/release-check.py
 
 ## Protocol regression fixtures
 
-`crates/gpudog-core/tests/protocol_golden.rs` checks the v6 wire contract,
+`crates/gpudog-core/tests/protocol_golden.rs` checks the v7 wire contract,
 and `crates/gpudog-daemon/tests/config_compat.rs` checks config
 compatibility. Fixtures are
 kept in this repository.
-`scripts/gen-golden-v6.py` generates current frames with its own Python
-encoder, not the Rust codec, so the two check each other. The v3 to v5
+`scripts/gen-golden-v7.py` generates current frames with its own Python
+encoder, not the Rust codec, so the two check each other. The v3 to v6
 fixtures document earlier wire layouts and are not tested;
-`gen-golden-v6.py` builds on the v3 to v5 generators, so keep them.
+`gen-golden-v7.py` builds on the v3 to v6 generators, so keep them.
 
 `config_recorded_results.txt` is a frozen record of what an earlier
 loader made of each case in `config_cases.txt`; it is never regenerated.

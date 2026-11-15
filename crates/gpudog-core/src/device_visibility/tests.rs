@@ -107,6 +107,7 @@ fn grants_must_match_view_request_count_and_order() {
     let grant = |uuid: &str| Granted {
         gpus: vec![0],
         uuids: vec![uuid.into()],
+        ..Granted::default()
     };
     assert!(view().validate_grant(&request, &grant("gpu-A")).is_ok());
     assert!(view().validate_grant(&request, &grant("GPU-b")).is_err());
@@ -126,7 +127,8 @@ fn grants_must_match_view_request_count_and_order() {
             &explicit,
             &Granted {
                 gpus: vec![0, 1],
-                uuids: vec!["GPU-a".into(), "GPU-b".into()]
+                uuids: vec!["GPU-a".into(), "GPU-b".into()],
+                ..Granted::default()
             }
         )
         .is_err());

@@ -5,7 +5,7 @@ _Last verified: 2026-11-02 against the unmanaged-process working tree_
 
 ## Summary
 
-Container clients use protocol-v6 UUID requests and the same host pathname
+Container clients use protocol-v7 UUID requests and the same host pathname
 Unix socket. No TCP transport, credential claim field or host network is
 required. The daemon shares host PIDs for observation; clients do not.
 Initial deployment assumes a

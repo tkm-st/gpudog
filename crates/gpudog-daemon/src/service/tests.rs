@@ -434,7 +434,8 @@ async fn grants_a_reservation_and_reports_the_devices() {
         Some(
             Granted {
                 gpus: vec![0, 1],
-                uuids: vec!["GPU-static-0".into(), "GPU-static-1".into()]
+                uuids: vec!["GPU-static-0".into(), "GPU-static-1".into()],
+                hold_limit_ms: 0,
             }
             .into()
         )
@@ -1345,6 +1346,7 @@ async fn resolves_an_acquire_by_uuid_onto_its_logical_index() {
             Granted {
                 gpus: vec![3, 1],
                 uuids: vec!["GPU-static-3".into(), "GPU-static-1".into()],
+                hold_limit_ms: 0,
             }
             .into()
         )

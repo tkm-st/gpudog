@@ -8,7 +8,7 @@ _Last verified: 2026-11-02 against the unmanaged-process working tree_
 The Rust client and daemon use a `SOCK_STREAM` Unix socket, defaulting to
 `/run/gpudog/gpudogd.sock`. Kernel peer credentials identify the user, and
 the connection's lifetime defines the reservation. tokio drives framed
-protocol-v6 I/O.
+protocol-v7 I/O.
 
 ## Details
 

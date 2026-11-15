@@ -230,7 +230,7 @@ This works even after the upgrade replaced the file:
 $ systemctl is-active gpudogd
 active
 $ sudo /proc/$(systemctl show -p MainPID --value gpudogd)/exe --version
-gpudogd 0.0.1 (protocol v6)
+gpudogd 0.0.1 (protocol v7)
 ```
 
 If `gpudog dash` shows the mismatch, read the
@@ -268,7 +268,7 @@ Both programs print their version and the wire protocol version:
 
 ```shell-session
 $ gpudog --version
-gpudog 0.0.1 (protocol v6)
+gpudog 0.0.1 (protocol v7)
 ```
 
 The client and the daemon must use the same protocol version. If they do not,

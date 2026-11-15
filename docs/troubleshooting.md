@@ -119,7 +119,7 @@ the UUID messages below.
 ## `protocol version mismatch`
 
 ```text
-gpudog: protocol version mismatch: daemon speaks protocol version 6, client speaks 5
+gpudog: protocol version mismatch: daemon speaks protocol version 7, client speaks 6
 ```
 
 The client and the daemon were built from incompatible versions. Install

@@ -35,6 +35,7 @@ fn granted(gpus: &[u32]) -> Granted {
     Granted {
         gpus: gpus.to_vec(),
         uuids: gpus.iter().map(|i| format!("GPU-{i}")).collect(),
+        hold_limit_ms: 0,
     }
 }
 
@@ -97,6 +98,7 @@ fn round_trips_every_message_type() {
     check_round_trip(Granted {
         gpus: vec![0, 3, 1023],
         uuids: uuids(&["GPU-a", "GPU-B-1", "gpu-0c"]),
+        hold_limit_ms: 7_200_000,
     });
     check_round_trip(Acquire {
         selection: GpuSelection::ExplicitUuids,
@@ -111,6 +113,7 @@ fn accepts_values_at_the_documented_bounds() {
     check_round_trip(Granted {
         gpus: vec![MAX_GPU_COUNT - 1],
         uuids: vec![format!("GPU-{}", "f".repeat(MAX_UUID_SIZE as usize - 4))],
+        hold_limit_ms: MAX_HOLD_LIMIT_MS,
     });
     check_round_trip(granted(&(0..MAX_GPU_COUNT).collect::<Vec<_>>()));
     check_round_trip(Acquire {
@@ -266,9 +269,31 @@ fn rejects_an_empty_granted_message() {
         ProtocolError::ValueOutOfRange
     );
     assert_eq!(
-        decode_err(&[0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
+        decode_err(&[
+            0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
+            0, 0, 0, 0, 0, 0, 0, 0, // hold limit
+        ]),
         ProtocolError::ValueOutOfRange
     );
+}
+
+#[test]
+fn rejects_a_hold_limit_above_the_documented_bound() {
+    let over = Granted {
+        hold_limit_ms: MAX_HOLD_LIMIT_MS + 1,
+        ..granted(&[0])
+    };
+    assert_eq!(encode_err(over), ProtocolError::ValueOutOfRange);
+    let mut reply = StatusReply {
+        holders: vec![ReservationInfo {
+            hold_limit_ms: MAX_HOLD_LIMIT_MS + 1,
+            ..ReservationInfo::default()
+        }],
+        ..StatusReply::default()
+    };
+    assert_eq!(encode_err(reply.clone()), ProtocolError::ValueOutOfRange);
+    reply.holders[0].hold_limit_ms = MAX_HOLD_LIMIT_MS;
+    check_round_trip(reply);
 }
 
 #[test]
@@ -283,7 +308,8 @@ fn rejects_duplicate_gpu_indices() {
         0x00, // gpus
         0x02, 0x00, 0x00, 0x00, // two uuids
         0x05, 0x00, 0x00, 0x00, b'G', b'P', b'U', b'-', b'a', //
-        0x05, 0x00, 0x00, 0x00, b'G', b'P', b'U', b'-', b'b',
+        0x05, 0x00, 0x00, 0x00, b'G', b'P', b'U', b'-', b'b', //
+        0, 0, 0, 0, 0, 0, 0, 0, // hold limit
     ];
     assert_eq!(decode_err(&body), ProtocolError::InvalidMessage);
 }
@@ -388,6 +414,7 @@ fn populated_status_reply() -> StatusReply {
             gpus: vec![0, 1],
             num_gpus: 2,
             age_ms: 123_456,
+            hold_limit_ms: 3_600_000,
             position: 0,
             command: b"python train.py".to_vec(),
         }],
@@ -705,11 +732,11 @@ fn a_status_reply_truncated_mid_entry_is_refused() {
 }
 
 #[test]
-fn the_protocol_version_was_bumped_when_priority_left_the_wire() {
-    // v5 added observation fields to StatusReply; v6 removed the priority
-    // from Acquire and ReservationInfo. Older peers must be refused at the
-    // handshake rather than left to misparse the new layout.
-    assert_eq!(PROTOCOL_VERSION, 6);
+fn the_protocol_version_was_bumped_when_the_hold_limit_joined_the_wire() {
+    // v6 removed the priority from Acquire and ReservationInfo; v7 added the
+    // hold limit to Granted and ReservationInfo. Older peers must be refused
+    // at the handshake rather than left to misparse the new layout.
+    assert_eq!(PROTOCOL_VERSION, 7);
     assert!(is_known_message_type(MessageType::Status as u16));
     assert!(is_known_message_type(MessageType::StatusReply as u16));
     assert!(!is_known_message_type(11));
@@ -754,11 +781,13 @@ fn rejects_inconsistent_uuid_fields() {
     let short = Granted {
         gpus: vec![0, 1],
         uuids: uuids(&["GPU-a"]),
+        ..Granted::default()
     };
     assert_eq!(encode_err(short), ProtocolError::InvalidMessage);
     let malformed = Granted {
         gpus: vec![0],
         uuids: uuids(&["GPU-a;rm"]),
+        ..Granted::default()
     };
     assert_eq!(encode_err(malformed), ProtocolError::InvalidMessage);
     let twice = Acquire {
@@ -791,7 +820,8 @@ fn rejects_inconsistent_uuid_fields() {
 fn a_non_utf8_uuid_on_the_wire_is_an_invalid_message() {
     let body = [
         0x05, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // gpus [0]
-        0x01, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, b'G', b'P', b'U', b'-', 0xFF,
+        0x01, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, b'G', b'P', b'U', b'-', 0xFF, //
+        0, 0, 0, 0, 0, 0, 0, 0, // hold limit
     ];
     assert_eq!(decode_err(&body), ProtocolError::InvalidMessage);
 }

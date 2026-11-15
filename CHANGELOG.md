@@ -23,6 +23,14 @@ release's section.
     [Upgrading the package](https://github.com/tkm-st/gpudog/blob/main/docs/installation.md#upgrading-the-package)
     for when to restart.
 
+## [0.0.2] - Unreleased
+
+### Changed
+
+*   Wire protocol version 7. `granted` and each `reservation` entry of
+    `status_reply` carry a `hold_limit_ms`. Clients and daemons of version 6
+    refuse each other with `protocol version mismatch`; upgrade both.
+
 ## [0.0.1] - 2026-11-15
 
 First release.

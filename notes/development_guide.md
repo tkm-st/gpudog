@@ -66,7 +66,7 @@ See `notes/ipc-design.md` for the rejected alternatives.
     `-g` accepts either indices or UUIDs, not a mixed list. `-t 0` is refused
     because zero on the wire means wait forever.
 *   Requested GPU indices are resolved in the client's CUDA environment.
-    Protocol v6 retains UUIDs and requires non-empty count candidates. Numeric,
+    Protocol v7 retains UUIDs and requires non-empty count candidates. Numeric,
     empty and container visibility restrictions are not discarded. Dense
     daemon numbers are internal/display metadata; children receive UUIDs.
 *   The daemon never changes OS nice values. Only SIGTERM is

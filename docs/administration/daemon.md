@@ -105,7 +105,7 @@ At startup the daemon:
 
 Startup, requests, warnings and errors are logged to stderr through a
 bounded writer queue. The first line, logged before the checks above, names
-the version, for example `gpudogd 0.0.1 (protocol v6) starting`. See
+the version, for example `gpudogd 0.0.1 (protocol v7) starting`. See
 [Logging](logging.md).
 New grants wait for successful GPU process observation and remain paused
 on query failures/staleness. Queue timeouts still run. See

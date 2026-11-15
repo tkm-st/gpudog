@@ -23,8 +23,8 @@ use gpudog_daemon::gpu_inventory::{
 use gpudog_daemon::service::{LogLevel, LogSink, Service, ShownDevice};
 use tokio::signal::unix::{signal, SignalKind};
 
-const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), " (protocol v6)");
-const _: () = assert!(PROTOCOL_VERSION == 6, "update VERSION");
+const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), " (protocol v7)");
+const _: () = assert!(PROTOCOL_VERSION == 7, "update VERSION");
 
 /// Upper bound on each exit step: runtime shutdown, then draining the log.
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(5);

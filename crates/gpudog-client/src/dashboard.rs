@@ -395,6 +395,7 @@ mod tests {
             gpus: gpus.to_vec(),
             num_gpus: gpus.len() as u32,
             age_ms: 125_000,
+            hold_limit_ms: 0,
             position: 0,
             command: b"python train.py".to_vec(),
         }

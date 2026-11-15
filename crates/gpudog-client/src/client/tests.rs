@@ -472,6 +472,7 @@ async fn an_out_of_view_grant_closes_the_connection_even_if_client_is_retained()
         line.send(Message::Granted(Granted {
             gpus: vec![0],
             uuids: vec!["GPU-other".into()],
+            ..Granted::default()
         }))
         .await
         .unwrap();
@@ -829,6 +830,7 @@ async fn an_unanswered_acquire_is_unresponsive_but_waiting_in_the_queue_is_not()
             line.send(Message::Granted(Granted {
                 gpus: vec![0],
                 uuids: vec!["GPU-static-0".into()],
+                ..Granted::default()
             }))
             .await
             .unwrap();
