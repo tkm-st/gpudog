@@ -14,6 +14,7 @@ use nix::unistd::Pid;
 use tokio::signal::unix::{signal, SignalKind};
 
 use crate::common::{complain, connect, note};
+use crate::hold_limit::{self, HoldLimit};
 
 /// Shell conventions for a command that could not be run, and the offset a
 /// shell adds when a process dies from a signal.
@@ -84,6 +85,14 @@ async fn recv(stream: &mut Option<tokio::signal::unix::Signal>) {
     }
 }
 
+/// Sleeps until `deadline`; never, without one.
+async fn until(deadline: Option<tokio::time::Instant>) {
+    match deadline {
+        Some(deadline) => tokio::time::sleep_until(deadline).await,
+        None => std::future::pending().await,
+    }
+}
+
 pub(crate) async fn run(socket: &Path, command: &[OsString], options: RunOptions) -> ExitCode {
     // Built before connecting: a request that cannot even be encoded should
     // not cost the daemon a connection slot.
@@ -141,7 +150,16 @@ pub(crate) async fn run(socket: &Path, command: &[OsString], options: RunOptions
         .map(u32::to_string)
         .collect::<Vec<_>>()
         .join(",");
-    note(format!("holding gpu(s) {indices} ({visible})"));
+    let limit_note = if granted.hold_limit_ms > 0 {
+        format!(
+            "; hold limit {}",
+            hold_limit::describe(granted.hold_limit_ms)
+        )
+    } else {
+        String::new()
+    };
+    note(format!("holding gpu(s) {indices} ({visible}){limit_note}"));
+    let mut hold = HoldLimit::new(granted.hold_limit_ms);
 
     // Installed before the child starts, so no SIGTERM is missed. Only
     // SIGTERM is forwarded: a terminal already delivers SIGINT, SIGQUIT and
@@ -198,6 +216,7 @@ pub(crate) async fn run(socket: &Path, command: &[OsString], options: RunOptions
     let status = loop {
         tokio::select! {
             status = child.wait() => break status,
+            () = until(hold.next_deadline()) => hold.on_deadline(pid),
             _ = recv(terminate) => {
                 // Passed on rather than dying first: the child owns the GPUs,
                 // and exiting now would not release them anyway (the child
@@ -212,6 +231,9 @@ pub(crate) async fn run(socket: &Path, command: &[OsString], options: RunOptions
             _ = recv(hangup) => {}
         }
     };
+    // A command stopped at its hold limit may leave processes it started;
+    // wait for them, or kill them when the grace period ends.
+    hold.finish().await;
     // The reservation ends once the child has exited too.
     drop(reservation);
 

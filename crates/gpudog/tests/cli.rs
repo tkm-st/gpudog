@@ -805,3 +805,137 @@ async fn inconsistent_nvml_identity_is_not_used_as_a_fallback() {
         .contains("NVML UUID disagrees with CUDA device"));
     assert_eq!(service.with_scheduler(Scheduler::free_device_count), 4);
 }
+
+/// A one-GPU daemon whose grants carry a hold limit of `max_hold_ms`.
+fn start_holding_for(max_hold_ms: u64) -> Service {
+    let config = ServiceConfig {
+        socket_path: scratch_socket(),
+        require_secure_directory: false,
+        max_hold_ms,
+        ..ServiceConfig::default()
+    };
+    Service::start(
+        Arc::new(StaticInventory::new(vec![
+            gpudog_daemon::gpu_inventory::GpuDevice {
+                index: 0,
+                nvml_index: 0,
+                uuid: support::uuid(0),
+                name: "mock device".into(),
+            },
+        ])),
+        None,
+        config,
+        discard_log(),
+    )
+    .unwrap()
+}
+
+fn is_running(pid: i32) -> bool {
+    std::fs::read_to_string(format!("/proc/{pid}/stat"))
+        .ok()
+        .and_then(|stat| {
+            stat.rsplit_once(')')
+                .map(|(_, rest)| !rest.trim_start().starts_with('Z'))
+        })
+        .unwrap_or(false)
+}
+
+#[tokio::test]
+async fn the_hold_limit_stops_the_command_and_frees_its_gpus() {
+    if runner_ignores(Signal::SIGTERM) {
+        return;
+    }
+    let service = start_holding_for(300);
+    let started = std::time::Instant::now();
+    let result = output(run_on(&service, &[], &["sleep", "30"])).await;
+    assert!(started.elapsed() < Duration::from_secs(10));
+    assert_eq!(result.code, Some(143), "{}", result.stderr);
+    assert!(
+        result.stderr.starts_with(&format!(
+            "gpudog: holding gpu(s) 0 ({}); hold limit 300ms\n",
+            support::uuid(0)
+        )),
+        "{}",
+        result.stderr
+    );
+    assert!(result.stderr.contains(
+        "gpudog: the hold limit of 300ms has ended; stopping the command (SIGKILL in 30s)\n"
+    ));
+    assert!(!result.stderr.contains("sent SIGKILL"), "{}", result.stderr);
+    eventually(|| service.with_scheduler(Scheduler::free_device_count) == 1).await;
+}
+
+#[tokio::test]
+async fn the_hold_limit_also_stops_what_a_wrapper_started() {
+    if runner_ignores(Signal::SIGTERM) {
+        return;
+    }
+    // The shell dies of SIGTERM at once; without stopping its child too,
+    // `sleep` would keep the reservation descriptor, and the GPU, for 30 s.
+    let service = start_holding_for(300);
+    let pid_file = scratch_socket().with_extension("pid");
+    let script = format!("sleep 30 & echo $! > {}; wait", sh_quote(&pid_file));
+    let result = output(run_on(&service, &[], &["sh", "-c", &script])).await;
+    assert_eq!(result.code, Some(143), "{}", result.stderr);
+    let sleeper: i32 = std::fs::read_to_string(&pid_file)
+        .unwrap()
+        .trim()
+        .parse()
+        .unwrap();
+    eventually(|| !is_running(sleeper)).await;
+    eventually(|| service.with_scheduler(Scheduler::free_device_count) == 1).await;
+    std::fs::remove_file(&pid_file).unwrap();
+}
+
+#[tokio::test]
+async fn a_command_that_ignores_sigterm_is_killed_after_the_grace_period() {
+    let service = start_holding_for(200);
+    let started = scratch_socket().with_extension("ignoring");
+    // Both the shell and `sleep` ignore SIGTERM; `sleep` inherits SIG_IGN.
+    let script = format!("trap '' TERM; touch {}; sleep 30", sh_quote(&started));
+    let mut command = run_on(&service, &[], &["sh", "-c", &script]);
+    command.env("GPUDOG_TEST_HOLD_GRACE_MS", "300");
+    let result = output(command).await;
+    assert_eq!(result.code, Some(137), "{}", result.stderr);
+    assert!(
+        result.stderr.contains("(SIGKILL in 300ms)"),
+        "{}",
+        result.stderr
+    );
+    assert!(
+        result
+            .stderr
+            .contains("gpudog: the command did not stop after SIGTERM; sent SIGKILL\n"),
+        "{}",
+        result.stderr
+    );
+    eventually(|| service.with_scheduler(Scheduler::free_device_count) == 1).await;
+    std::fs::remove_file(&started).unwrap();
+}
+
+#[tokio::test]
+async fn a_longer_grace_than_the_default_is_not_honoured() {
+    let service = start_holding_for(100);
+    let mut command = run_on(&service, &[], &["sleep", "30"]);
+    command.env("GPUDOG_TEST_HOLD_GRACE_MS", "3600000");
+    let result = output(command).await;
+    assert!(
+        result.stderr.contains("(SIGKILL in 30s)"),
+        "{}",
+        result.stderr
+    );
+}
+
+#[tokio::test]
+async fn a_command_that_ends_before_its_hold_limit_is_left_alone() {
+    let service = start_holding_for(60_000);
+    let result = output(run_on(&service, &[], &["true"])).await;
+    assert_eq!(result.code, Some(0), "{}", result.stderr);
+    assert_eq!(
+        result.stderr,
+        format!(
+            "gpudog: holding gpu(s) 0 ({}); hold limit 1m\n",
+            support::uuid(0)
+        )
+    );
+}

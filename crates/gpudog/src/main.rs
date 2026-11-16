@@ -4,6 +4,7 @@ mod cli;
 mod common;
 mod dash;
 mod health;
+mod hold_limit;
 mod run;
 
 use std::process::ExitCode;
