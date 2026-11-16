@@ -124,10 +124,20 @@ fn reservation_rows(list: &[ReservationInfo], queued: bool) -> Vec<Vec<String>> 
             } else {
                 row.push(join(&info.gpus));
             }
+            // A holder with a hold limit shows it after its age: `2m 5s / 2h 0m`.
+            let age = if !queued && info.hold_limit_ms > 0 {
+                format!(
+                    "{} / {}",
+                    human_age(info.age_ms),
+                    human_age(info.hold_limit_ms)
+                )
+            } else {
+                human_age(info.age_ms)
+            };
             row.extend([
                 info.uid.to_string(),
                 info.pid.to_string(),
-                human_age(info.age_ms),
+                age,
                 sanitize_display_text(&info.command),
             ]);
             row
@@ -456,6 +466,27 @@ mod tests {
         for field in ["0,2", "1000", "4242", "2m 5s"] {
             assert!(row.contains(field), "{field} missing from {row:?}");
         }
+    }
+
+    #[test]
+    fn a_holder_with_a_hold_limit_shows_it_after_its_age() {
+        let limited = ReservationInfo {
+            hold_limit_ms: 7_200_000,
+            ..holder(&[1])
+        };
+        let status = StatusReply {
+            device_count: 4,
+            holders: vec![holder(&[0]), limited],
+            ..StatusReply::default()
+        };
+        let text = render(&status, &no_processes(), 5);
+        let rows: Vec<&str> = text
+            .lines()
+            .filter(|l| l.contains("python train.py"))
+            .collect();
+        assert_eq!(rows.len(), 2);
+        assert!(!rows[0].contains(" / "), "{:?}", rows[0]);
+        assert!(rows[1].contains("2m 5s / 2h 0m"), "{:?}", rows[1]);
     }
 
     #[test]
