@@ -78,6 +78,11 @@ struct Outcome {
     stderr: String,
 }
 
+/// Runs `command` to the end. This waits until every holder of its stdout
+/// and stderr has closed them, so a process that outlives `gpudog` delays
+/// the result rather than failing the test. A test whose point is that a
+/// process is stopped must assert the elapsed time or that process's state,
+/// and should be shown to fail without the fix.
 async fn output(mut command: Command) -> Outcome {
     let output = command.output().await.unwrap();
     Outcome {
