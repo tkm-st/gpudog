@@ -57,12 +57,14 @@ CUDA/NVML symbols into `tmp/` and inject it only through subprocess library
 paths. The unsafe mock ABI is not linked into any workspace crate or
 shipped binary.
 
-The client has one test hook: `GPUDOG_TEST_HOLD_GRACE_MS` shortens the
-30-second grace between `SIGTERM` and `SIGKILL` at the hold limit, so CLI
-tests finish quickly. Release binaries honour it too, and it is
-deliberately left out of the user documentation. Only a value below 30
-seconds is used, so it cannot lengthen the grace or let a command outlive
-its limit; keep it that way.
+The client has one test hook: `GPUDOG_TEST_HOLD_GRACE_MS`, in
+milliseconds, shortens the 30-second grace between `SIGTERM` and `SIGKILL`
+at the hold limit, so CLI tests finish quickly. Release binaries honour it
+too, and it is deliberately left out of the user documentation. A value of
+30000 or more, or one that is not a number, is silently ignored, so it
+cannot lengthen the grace or let a command outlive its limit; keep it that
+way.
+
 NVML tests may either exercise the driver or report that it is unavailable;
 a green unit suite alone is not a real GPU/container verification.
 

@@ -129,7 +129,7 @@ gpudog: the command was killed by signal 9 (SIGKILL)
     `gpudog: the command was killed by signal 15 (SIGTERM)`, or with its own
     status if it handles the signal.
 *   Those still running 30 seconds later get `SIGKILL`. The 30 seconds are
-    fixed and cannot be changed, which may be too short to save a large
+    fixed and cannot be lengthened, which may be too short to save a large
     model: save checkpoints regularly, and treat `SIGTERM` as the last
     chance to finish one that is already being written.
 *   `gpudog` returns the command's status as usual: `143` for `SIGTERM`,
@@ -138,11 +138,15 @@ gpudog: the command was killed by signal 9 (SIGKILL)
     ended` line tells a stop at the limit apart from a `SIGTERM` someone
     sent.
 *   Processes the command started are stopped too, even if the command
-    itself exits first at `SIGTERM`. `gpudog` then waits for them until the
-    30 seconds end: a `SIGTERM` sent to `gpudog` meanwhile is not passed on,
-    and Ctrl-C reaches only those still in the terminal's foreground job.
-    Either way they get `SIGKILL` when the 30 seconds end. But the limit is enforced only while
-    `gpudog` runs: if the command exits by itself before the limit, `gpudog`
+    itself exits first at `SIGTERM`.
+*   If the command has exited but processes it started are still running,
+    `gpudog` waits until they have all exited, and at most until the 30
+    seconds end. Meanwhile `gpudog` keeps waiting whatever you send it: a
+    `SIGTERM` is not passed on, and Ctrl-C usually does not stop processes
+    started in the background with `&`. Those still running get
+    `SIGKILL` when the 30 seconds end; to stop them sooner, `kill` them
+    yourself.
+*   The limit is enforced only while `gpudog` runs: if the command exits by itself before the limit, `gpudog`
     exits with it, and background processes it left behind are not stopped
     later (see
     [My GPUs were not released](../troubleshooting.md#my-gpus-were-not-released)).
@@ -224,7 +228,9 @@ holds the reservation, has exited (see [Reservations](../concepts.md#reservation
     not exit on them; it keeps waiting while the command cleans up.
 *   `SIGTERM` sent to `gpudog` is forwarded to the command itself, every time
     it arrives. Processes the command started do not receive it from
-    `gpudog`; only the [hold limit](#hold-limit) signals them as well. If the command is a wrapper script, start the real program with
+    `gpudog`; only the [hold limit](#hold-limit) signals them as well. Once
+    the command has exited after a hold-limit stop, `SIGTERM` is not
+    forwarded and `gpudog` keeps waiting (see [Hold limit](#hold-limit)). If the command is a wrapper script, start the real program with
     `exec` (for example `exec python train.py`) so that it receives `SIGTERM`.
 *   A signal that was already ignored when `gpudog` started, for example
     `SIGHUP` under `nohup gpudog run ...`, stays ignored for the command.
