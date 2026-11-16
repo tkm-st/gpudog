@@ -155,9 +155,10 @@ gpudog: the command was killed by signal 9 (SIGKILL)
     longer reserved for it (see [Signals](#signals)).
 *   A process that has left your command's process tree is not stopped. It
     keeps the GPUs until it exits, and `gpudogd` logs it. This happens to a
-    program that runs itself in the background by forking twice, and to a
-    process started during the 30 seconds whose parent then exits before
-    `SIGKILL` is sent.
+    program that runs itself in the background by forking twice. `gpudog`
+    looks for new processes every half second during the 30 seconds, so it
+    also happens to one whose parent exits within about half a second of
+    starting it.
 *   A job stopped with Ctrl-Z keeps its GPUs, and `gpudog` is stopped with
     it. If the limit ends meanwhile, the command is stopped as soon as the
     job continues.

@@ -984,6 +984,61 @@ async fn survivors_of_an_exited_command_are_killed_with_what_they_started() {
 }
 
 #[tokio::test]
+async fn what_a_worker_starts_before_exiting_is_killed_while_the_command_runs() {
+    if runner_ignores(Signal::SIGTERM) {
+        return;
+    }
+    // The command ignores SIGTERM and keeps running. A worker it started
+    // starts another process at SIGTERM and exits a second later, so that
+    // process is reparented long before SIGKILL: only a search made while
+    // the worker lived can find it.
+    let service = start_holding_for(1500);
+    let base = scratch_socket();
+    let ready = base.with_extension("ready");
+    let late = base.with_extension("late");
+    let worker = base.with_extension("worker.sh");
+    std::fs::write(
+        &worker,
+        format!(
+            "trap 'sleep 30 & echo $! > {late}; sleep 1; exit 0' TERM\ntouch {ready}\nwhile :; do sleep 0.05; done\n",
+            late = sh_quote(&late),
+            ready = sh_quote(&ready),
+        ),
+    )
+    .unwrap();
+    let script = format!(
+        "sh {} & trap '' TERM; while :; do sleep 0.05; done",
+        sh_quote(&worker)
+    );
+    let mut command = run_on(&service, &[], &["sh", "-c", &script]);
+    command.env("GPUDOG_TEST_HOLD_GRACE_MS", "2500");
+    let started = std::time::Instant::now();
+    let result = output(command).await;
+    // A surviving `sleep 30` would hold the pipes for 30 s.
+    assert!(
+        started.elapsed() < Duration::from_secs(15),
+        "{}",
+        result.stderr
+    );
+    assert!(
+        ready.exists(),
+        "the worker never started: {}",
+        result.stderr
+    );
+    assert_eq!(result.code, Some(137), "{}", result.stderr);
+    let late_pid: i32 = std::fs::read_to_string(&late)
+        .unwrap()
+        .trim()
+        .parse()
+        .unwrap();
+    eventually(|| !is_running(late_pid)).await;
+    eventually(|| service.with_scheduler(Scheduler::free_device_count) == 1).await;
+    for file in [&ready, &late, &worker] {
+        std::fs::remove_file(file).unwrap();
+    }
+}
+
+#[tokio::test]
 async fn a_longer_grace_than_the_default_is_not_honoured() {
     if runner_ignores(Signal::SIGTERM) {
         // `sleep` would inherit SIG_IGN and last the whole 30 s grace.

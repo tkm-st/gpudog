@@ -6,8 +6,9 @@
 //! processes using it have exited, so stopping them is the client's job.
 //! Signalled are the processes descended from the command when the limit
 //! ends, those found descended from the command or from any of them still
-//! alive at the searches during the grace period (every [`SCAN`], and
-//! before SIGKILL), and the command itself. A process that left the
+//! alive at the searches during the grace period (every [`SCAN`], whether
+//! or not the command itself has exited, and before SIGKILL), and the
+//! command itself. A process that left the
 //! tree (its parent exited, or it double-forked) is not found.
 
 use std::collections::HashMap;
@@ -126,7 +127,10 @@ struct Found {
 }
 
 /// The descendants of `root` in `table`, not `root` itself, parents before
-/// children. Zombies are included, so that their children are still found.
+/// children. Zombies are included: the kernel reparents a process's
+/// children before it becomes a zombie, but `/proc` is not read atomically,
+/// so a child read before its parent exited may still name it. [`confirmed`]
+/// drops such a child.
 fn descendants(table: &HashMap<i32, Stat>, root: i32) -> Vec<Found> {
     let mut children: HashMap<i32, Vec<i32>> = HashMap::new();
     for (&pid, stat) in table {
@@ -292,10 +296,13 @@ enum State {
     Running {
         ends: Option<Instant>,
     },
-    /// SIGTERM was sent to `targets`; SIGKILL follows at `kill_at`.
+    /// SIGTERM was sent to `targets`; SIGKILL follows at `kill_at`. Until
+    /// then `/proc` is searched again at `next_scan` for processes they
+    /// have started.
     Stopping {
         targets: Vec<Process>,
         kill_at: Instant,
+        next_scan: Instant,
     },
     Done,
 }
@@ -321,7 +328,9 @@ impl HoldLimit {
     pub(crate) fn next_deadline(&self) -> Option<Instant> {
         match &self.state {
             State::Running { ends } => *ends,
-            State::Stopping { kill_at, .. } => Some(*kill_at),
+            State::Stopping {
+                kill_at, next_scan, ..
+            } => Some((*kill_at).min(*next_scan)),
             State::Done => None,
         }
     }
@@ -340,12 +349,18 @@ impl HoldLimit {
                 ));
                 signal_command(command, Signal::SIGTERM);
                 signal_all(&targets, Signal::SIGTERM);
+                let now = Instant::now();
                 self.state = State::Stopping {
                     targets,
-                    kill_at: Instant::now() + grace,
+                    kill_at: now + grace,
+                    next_scan: now + SCAN,
                 };
             }
-            State::Stopping { mut targets, .. } => {
+            State::Stopping {
+                mut targets,
+                kill_at,
+                ..
+            } => {
                 // Anything started during the grace period too.
                 if let Some(pid) = command {
                     for process in command_tree(pid) {
@@ -355,6 +370,16 @@ impl HoldLimit {
                     }
                 }
                 grow(&mut targets);
+                let now = Instant::now();
+                if now < kill_at {
+                    // Only a search: the command still runs.
+                    self.state = State::Stopping {
+                        targets,
+                        kill_at,
+                        next_scan: now + SCAN,
+                    };
+                    return;
+                }
                 let killed = signal_command(command, Signal::SIGKILL);
                 if signal_all(&targets, Signal::SIGKILL) > 0 || killed {
                     note("the command did not stop after SIGTERM; sent SIGKILL");
@@ -368,16 +393,22 @@ impl HoldLimit {
     /// for the rest of what was signalled, and kills whatever is left when
     /// the grace period ends. Their GPUs are not free until they exit.
     pub(crate) async fn finish(&mut self) {
-        let mut next_scan = Instant::now();
+        let mut first = true;
         loop {
-            let State::Stopping { targets, kill_at } = &mut self.state else {
+            let State::Stopping {
+                targets,
+                kill_at,
+                next_scan,
+            } = &mut self.state
+            else {
                 return;
             };
             // A process started by a target that exits before the next scan
             // is not found: the kernel reparents it as its parent exits.
-            if Instant::now() >= next_scan {
+            if first || Instant::now() >= *next_scan {
                 grow(targets);
-                next_scan = Instant::now() + SCAN;
+                *next_scan = Instant::now() + SCAN;
+                first = false;
             } else {
                 targets.retain(|target| is_alive(*target));
             }
