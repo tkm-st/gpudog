@@ -989,7 +989,7 @@ async fn what_a_worker_starts_before_exiting_is_killed_while_the_command_runs() 
         return;
     }
     // The command ignores SIGTERM and keeps running. A worker it started
-    // starts another process at SIGTERM and exits a second later, so that
+    // starts another process at SIGTERM and exits two seconds later, so that
     // process is reparented long before SIGKILL: only a search made while
     // the worker lived can find it.
     let service = start_holding_for(1500);
@@ -1000,7 +1000,7 @@ async fn what_a_worker_starts_before_exiting_is_killed_while_the_command_runs() 
     std::fs::write(
         &worker,
         format!(
-            "trap 'sleep 30 & echo $! > {late}; sleep 1; exit 0' TERM\ntouch {ready}\nwhile :; do sleep 0.05; done\n",
+            "trap 'sleep 30 & echo $! > {late}; sleep 2; exit 0' TERM\ntouch {ready}\nwhile :; do sleep 0.05; done\n",
             late = sh_quote(&late),
             ready = sh_quote(&ready),
         ),
@@ -1011,7 +1011,7 @@ async fn what_a_worker_starts_before_exiting_is_killed_while_the_command_runs() 
         sh_quote(&worker)
     );
     let mut command = run_on(&service, &[], &["sh", "-c", &script]);
-    command.env("GPUDOG_TEST_HOLD_GRACE_MS", "2500");
+    command.env("GPUDOG_TEST_HOLD_GRACE_MS", "4000");
     let started = std::time::Instant::now();
     let result = output(command).await;
     // A surviving `sleep 30` would hold the pipes for 30 s.
