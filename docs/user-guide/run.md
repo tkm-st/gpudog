@@ -126,9 +126,13 @@ gpudog: the hold limit of 1d has ended; stopping the command (SIGKILL in 30s)
 *   `gpudog` returns the command's status as usual: `143` for `SIGTERM`,
     `137` for `SIGKILL`, or the command's own status if it exits by itself
     (see [Exit status](#exit-status)).
-*   A process that has left your command's process tree, for example a
-    daemon that forked twice, is not stopped. It keeps the GPUs until it
-    exits, and the daemon logs it.
+*   A process that has left your command's process tree is not stopped. It
+    keeps the GPUs until it exits, and the daemon logs it. This happens to a
+    daemon that forked twice, and to a process started during the 30
+    seconds whose parent then exits before `SIGKILL` is sent.
+*   A job stopped with Ctrl-Z keeps its GPUs, and `gpudog` is stopped with
+    it. If the limit ends meanwhile, the command is stopped as soon as the
+    job continues.
 *   If `/proc` does not belong to the PID namespace `gpudog` runs in (for
     example under `unshare --pid --fork` without `--mount-proc`), only the
     command itself is stopped, not the processes it started.

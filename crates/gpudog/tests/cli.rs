@@ -872,10 +872,15 @@ async fn the_hold_limit_also_stops_what_a_wrapper_started() {
     }
     // The shell dies of SIGTERM at once; without stopping its child too,
     // `sleep` would keep the reservation descriptor, and the GPU, for 30 s.
-    let service = start_holding_for(300);
+    // Long enough for the shell to write the pid file first, on a busy runner.
+    let service = start_holding_for(1500);
     let pid_file = scratch_socket().with_extension("pid");
     let script = format!("sleep 30 & echo $! > {}; wait", sh_quote(&pid_file));
+    let started = std::time::Instant::now();
     let result = output(run_on(&service, &[], &["sh", "-c", &script])).await;
+    // `output` also waits for the pipes, which a surviving `sleep` holds:
+    // the time is what shows it was stopped, not left to run its 30 s.
+    assert!(started.elapsed() < Duration::from_secs(15));
     assert_eq!(result.code, Some(143), "{}", result.stderr);
     let sleeper: i32 = std::fs::read_to_string(&pid_file)
         .unwrap()
@@ -889,7 +894,8 @@ async fn the_hold_limit_also_stops_what_a_wrapper_started() {
 
 #[tokio::test]
 async fn a_command_that_ignores_sigterm_is_killed_after_the_grace_period() {
-    let service = start_holding_for(200);
+    // Long enough for the shell to install its trap first, on a busy runner.
+    let service = start_holding_for(1500);
     let started = scratch_socket().with_extension("ignoring");
     // Both the shell and `sleep` ignore SIGTERM; `sleep` inherits SIG_IGN.
     let script = format!("trap '' TERM; touch {}; sleep 30", sh_quote(&started));
@@ -914,7 +920,70 @@ async fn a_command_that_ignores_sigterm_is_killed_after_the_grace_period() {
 }
 
 #[tokio::test]
+async fn survivors_of_an_exited_command_are_killed_with_what_they_started() {
+    if runner_ignores(Signal::SIGTERM) {
+        return;
+    }
+    // The command exits at SIGTERM. A worker it started ignores SIGTERM and,
+    // when it arrives, starts another process, which was not there at the
+    // limit. Both must be killed when the grace period ends, after the
+    // command itself has gone.
+    let service = start_holding_for(1500);
+    let base = scratch_socket();
+    let ready = base.with_extension("ready");
+    let late = base.with_extension("late");
+    let worker = base.with_extension("worker.sh");
+    std::fs::write(
+        &worker,
+        format!(
+            "trap 'sleep 30 & echo $! > {late}' TERM\ntouch {ready}\nwhile :; do sleep 0.05; done\n",
+            late = sh_quote(&late),
+            ready = sh_quote(&ready),
+        ),
+    )
+    .unwrap();
+    let script = format!(
+        "sh {} & trap 'exit 0' TERM; while :; do sleep 0.05; done",
+        sh_quote(&worker)
+    );
+    let mut command = run_on(&service, &[], &["sh", "-c", &script]);
+    command.env("GPUDOG_TEST_HOLD_GRACE_MS", "1000");
+    let started = std::time::Instant::now();
+    let result = output(command).await;
+    // As above: a surviving `sleep 30` would hold the pipes for 30 s.
+    assert!(started.elapsed() < Duration::from_secs(15));
+    // The command's own status: it exited by itself.
+    assert_eq!(result.code, Some(0), "{}", result.stderr);
+    assert!(
+        ready.exists(),
+        "the worker never started: {}",
+        result.stderr
+    );
+    assert!(
+        result
+            .stderr
+            .contains("gpudog: the command did not stop after SIGTERM; sent SIGKILL\n"),
+        "{}",
+        result.stderr
+    );
+    let late_pid: i32 = std::fs::read_to_string(&late)
+        .unwrap()
+        .trim()
+        .parse()
+        .unwrap();
+    eventually(|| !is_running(late_pid)).await;
+    eventually(|| service.with_scheduler(Scheduler::free_device_count) == 1).await;
+    for file in [&ready, &late, &worker] {
+        std::fs::remove_file(file).unwrap();
+    }
+}
+
+#[tokio::test]
 async fn a_longer_grace_than_the_default_is_not_honoured() {
+    if runner_ignores(Signal::SIGTERM) {
+        // `sleep` would inherit SIG_IGN and last the whole 30 s grace.
+        return;
+    }
     let service = start_holding_for(100);
     let mut command = run_on(&service, &[], &["sleep", "30"]);
     command.env("GPUDOG_TEST_HOLD_GRACE_MS", "3600000");

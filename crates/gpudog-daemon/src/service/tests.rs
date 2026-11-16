@@ -2132,12 +2132,14 @@ async fn a_reservation_past_its_hold_limit_is_logged_once_and_kept() {
 #[tokio::test]
 async fn a_holder_that_leaves_before_its_limit_is_not_reported_overdue() {
     let (sink, events) = recording_log();
-    let service = start_holding_for(1, 100, sink);
+    // Well above the time the daemon takes to see the client go, even when
+    // busy.
+    let service = start_holding_for(1, 1000, sink);
     let mut client = Client::ready(&service).await;
     assert!(is_granted(&client.acquire(want(1)).await));
     drop(client);
     eventually(|| service.with_scheduler(Scheduler::free_device_count) == 1).await;
-    pause(250).await;
+    pause(1200).await;
     assert!(!events
         .lock()
         .unwrap()

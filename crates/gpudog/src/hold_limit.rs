@@ -177,14 +177,44 @@ fn confirmed(found: &[Found], root: i32, current: impl Fn(i32) -> Option<Stat>) 
 /// and the command's parent there is this process. Not so, for example,
 /// under `unshare --pid --fork` without `--mount-proc`.
 fn proc_is_ours(table: &HashMap<i32, Stat>, command: i32) -> bool {
-    let own = std::process::id();
-    let self_link = std::fs::read_link("/proc/self")
-        .ok()
-        .and_then(|link| link.to_str()?.parse::<u32>().ok());
-    self_link == Some(own)
+    proc_self_is_ours()
         && table
             .get(&command)
-            .is_some_and(|stat| stat.ppid as u32 == own)
+            .is_some_and(|stat| stat.ppid as u32 == std::process::id())
+}
+
+fn proc_self_is_ours() -> bool {
+    std::fs::read_link("/proc/self")
+        .ok()
+        .and_then(|link| link.to_str()?.parse::<u32>().ok())
+        == Some(std::process::id())
+}
+
+/// Adds to `targets` the live descendants of every target still alive: a
+/// process signalled at the limit may start others during the grace period,
+/// even after the command itself has exited. One that has already outlived
+/// the process that started it is reparented, and not found.
+fn grow(targets: &mut Vec<Process>) {
+    if targets.is_empty() || !proc_self_is_ours() {
+        return;
+    }
+    let table = process_table();
+    let parents: Vec<Process> = targets
+        .iter()
+        .copied()
+        .filter(|target| {
+            table
+                .get(&target.pid)
+                .is_some_and(|stat| stat.state != 'Z' && stat.start == target.start)
+        })
+        .collect();
+    for parent in parents {
+        for process in confirmed(&descendants(&table, parent.pid), parent.pid, stat_of) {
+            if !targets.contains(&process) {
+                targets.push(process);
+            }
+        }
+    }
 }
 
 /// The command's live descendants, or none if `/proc` cannot be trusted to
@@ -283,7 +313,7 @@ impl HoldLimit {
                 };
             }
             State::Stopping { mut targets, .. } => {
-                // Anything the command started during the grace period too.
+                // Anything started during the grace period too.
                 if let Some(pid) = command {
                     for process in command_tree(pid) {
                         if !targets.contains(&process) {
@@ -291,6 +321,7 @@ impl HoldLimit {
                         }
                     }
                 }
+                grow(&mut targets);
                 let killed = signal_command(command, Signal::SIGKILL);
                 if signal_all(&targets, Signal::SIGKILL) > 0 || killed {
                     note("the command did not stop after SIGTERM; sent SIGKILL");
@@ -304,17 +335,21 @@ impl HoldLimit {
     /// for the rest of what was signalled, and kills whatever is left when
     /// the grace period ends. Their GPUs are not free until they exit.
     pub(crate) async fn finish(&mut self) {
-        while let State::Stopping { targets, kill_at } = &self.state {
+        loop {
+            let State::Stopping { targets, kill_at } = &mut self.state else {
+                return;
+            };
+            grow(targets);
             if !targets.iter().any(|process| is_alive(*process)) {
                 self.state = State::Done;
                 return;
             }
-            if Instant::now() >= *kill_at {
+            let kill_at = *kill_at;
+            if Instant::now() >= kill_at {
                 self.on_deadline(None);
                 return;
             }
-            let wake = (Instant::now() + POLL).min(*kill_at);
-            tokio::time::sleep_until(wake).await;
+            tokio::time::sleep_until((Instant::now() + POLL).min(kill_at)).await;
         }
     }
 }

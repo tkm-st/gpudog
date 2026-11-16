@@ -25,7 +25,6 @@ fn unmanaged_watch_interval_is_positive_bounded_and_defaults_to_one_second() {
     assert!(!warnings("watch_unmanaged_ms = false").is_empty());
 }
 
-/// Applies `text`, requiring success with at least one warning.
 #[test]
 fn the_hold_limit_defaults_to_none_and_is_bounded_by_the_wire() {
     assert_eq!(loaded("").service.max_hold_ms, 0);
@@ -55,6 +54,7 @@ fn the_hold_limit_defaults_to_none_and_is_bounded_by_the_wire() {
     );
 }
 
+/// Applies `text`, requiring success with at least one warning.
 fn warnings(text: &str) -> Vec<String> {
     let warnings = DaemonConfig::default()
         .apply_text(text, "<config>")

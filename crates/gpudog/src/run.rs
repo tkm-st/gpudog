@@ -215,6 +215,9 @@ pub(crate) async fn run(socket: &Path, command: &[OsString], options: RunOptions
 
     let status = loop {
         tokio::select! {
+            // First, so a command that exits as its hold limit ends is not
+            // reported as stopped.
+            biased;
             status = child.wait() => break status,
             () = until(hold.next_deadline()) => hold.on_deadline(pid),
             _ = recv(terminate) => {
