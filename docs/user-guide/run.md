@@ -129,6 +129,9 @@ gpudog: the hold limit of 1d has ended; stopping the command (SIGKILL in 30s)
 *   A process that has left your command's process tree, for example a
     daemon that forked twice, is not stopped. It keeps the GPUs until it
     exits, and the daemon logs it.
+*   If `/proc` does not belong to the PID namespace `gpudog` runs in (for
+    example under `unshare --pid --fork` without `--mount-proc`), only the
+    command itself is stopped, not the processes it started.
 *   For a shorter limit of your own, run the command under `timeout`, for
     example `gpudog run -- timeout 2h python train.py`.
 

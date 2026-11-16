@@ -106,35 +106,109 @@ fn process_table() -> HashMap<i32, Stat> {
         .collect()
 }
 
-/// `root` and its descendants in `table`, parents before children. A zombie
-/// is left out: it has already exited.
-fn descendants(table: &HashMap<i32, Stat>, root: i32) -> Vec<Process> {
+/// One process found under the command, with its parent as the table
+/// recorded it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Found {
+    process: Process,
+    ppid: i32,
+    zombie: bool,
+}
+
+/// The descendants of `root` in `table`, not `root` itself, parents before
+/// children. Zombies are included, so that their children are still found.
+fn descendants(table: &HashMap<i32, Stat>, root: i32) -> Vec<Found> {
     let mut children: HashMap<i32, Vec<i32>> = HashMap::new();
     for (&pid, stat) in table {
         children.entry(stat.ppid).or_default().push(pid);
     }
-    let mut found = Vec::new();
-    let mut pending = vec![root];
+    let mut found: Vec<Found> = Vec::new();
+    let mut pending: Vec<i32> = children.get(&root).cloned().unwrap_or_default();
     while let Some(pid) = pending.pop() {
         let Some(stat) = table.get(&pid) else {
             continue;
         };
-        if found.iter().any(|process: &Process| process.pid == pid) {
+        if pid == root || found.iter().any(|entry| entry.process.pid == pid) {
             continue;
         }
-        if stat.state != 'Z' {
-            found.push(Process {
+        found.push(Found {
+            process: Process {
                 pid,
                 start: stat.start,
-            });
-        }
+            },
+            ppid: stat.ppid,
+            zombie: stat.state == 'Z',
+        });
         pending.extend(children.get(&pid).into_iter().flatten());
     }
     found
 }
 
+/// Keeps the live processes of `found` whose own and whose parent's start
+/// times, read again through `current`, are still the ones recorded. The
+/// table is not one atomic snapshot: if a parent exited and its pid was
+/// reused while `/proc` was read, the new owner's children would otherwise
+/// look like the command's. A process whose parent exited in that window
+/// is dropped too; it is found again at the SIGKILL pass if the command
+/// still runs.
+fn confirmed(found: &[Found], root: i32, current: impl Fn(i32) -> Option<Stat>) -> Vec<Process> {
+    let mut accepted: Vec<Found> = Vec::new();
+    for entry in found {
+        let parent_holds = entry.ppid == root
+            || accepted.iter().any(|parent| {
+                parent.process.pid == entry.ppid
+                    && current(entry.ppid).is_some_and(|stat| stat.start == parent.process.start)
+            });
+        let still_itself = current(entry.process.pid)
+            .is_some_and(|stat| stat.start == entry.process.start && stat.ppid == entry.ppid);
+        if parent_holds && still_itself {
+            accepted.push(*entry);
+        }
+    }
+    accepted
+        .into_iter()
+        .filter(|entry| !entry.zombie)
+        .map(|entry| entry.process)
+        .collect()
+}
+
+/// True when `/proc` shows this process's own PID namespace, so that pids
+/// read there are the ones `kill` reaches: `/proc/self` names this process,
+/// and the command's parent there is this process. Not so, for example,
+/// under `unshare --pid --fork` without `--mount-proc`.
+fn proc_is_ours(table: &HashMap<i32, Stat>, command: i32) -> bool {
+    let own = std::process::id();
+    let self_link = std::fs::read_link("/proc/self")
+        .ok()
+        .and_then(|link| link.to_str()?.parse::<u32>().ok());
+    self_link == Some(own)
+        && table
+            .get(&command)
+            .is_some_and(|stat| stat.ppid as u32 == own)
+}
+
+/// The command's live descendants, or none if `/proc` cannot be trusted to
+/// name them.
+fn command_tree(command: Pid) -> Vec<Process> {
+    let table = process_table();
+    if !proc_is_ours(&table, command.as_raw()) {
+        return Vec::new();
+    }
+    confirmed(
+        &descendants(&table, command.as_raw()),
+        command.as_raw(),
+        stat_of,
+    )
+}
+
 fn is_alive(process: Process) -> bool {
     stat_of(process.pid).is_some_and(|stat| stat.state != 'Z' && stat.start == process.start)
+}
+
+/// Signals the command itself. It is this process's child and has not been
+/// reaped while `command` is `Some`, so its pid cannot have been reused.
+fn signal_command(command: Option<Pid>, signal: Signal) -> bool {
+    command.is_some_and(|pid| kill(pid, signal).is_ok())
 }
 
 /// Sends `signal` to each process still alive as itself. Checking the
@@ -194,14 +268,14 @@ impl HoldLimit {
     pub(crate) fn on_deadline(&mut self, command: Option<Pid>) {
         match std::mem::replace(&mut self.state, State::Done) {
             State::Running { .. } => {
-                let targets = command
-                    .map_or_else(Vec::new, |pid| descendants(&process_table(), pid.as_raw()));
+                let targets = command.map_or_else(Vec::new, command_tree);
                 let grace = grace();
                 note(format!(
                     "the hold limit of {} has ended; stopping the command (SIGKILL in {})",
                     describe(self.limit_ms),
                     describe(u64::try_from(grace.as_millis()).unwrap_or(u64::MAX)),
                 ));
+                signal_command(command, Signal::SIGTERM);
                 signal_all(&targets, Signal::SIGTERM);
                 self.state = State::Stopping {
                     targets,
@@ -211,13 +285,14 @@ impl HoldLimit {
             State::Stopping { mut targets, .. } => {
                 // Anything the command started during the grace period too.
                 if let Some(pid) = command {
-                    for process in descendants(&process_table(), pid.as_raw()) {
+                    for process in command_tree(pid) {
                         if !targets.contains(&process) {
                             targets.push(process);
                         }
                     }
                 }
-                if signal_all(&targets, Signal::SIGKILL) > 0 {
+                let killed = signal_command(command, Signal::SIGKILL);
+                if signal_all(&targets, Signal::SIGKILL) > 0 || killed {
                     note("the command did not stop after SIGTERM; sent SIGKILL");
                 }
             }
@@ -272,35 +347,74 @@ mod tests {
         assert_eq!(parse_stat("no parenthesis"), None);
     }
 
+    fn process(pid: i32, start: u64) -> Process {
+        Process { pid, start }
+    }
+
+    fn pids(processes: &[Process]) -> Vec<i32> {
+        let mut pids: Vec<i32> = processes.iter().map(|p| p.pid).collect();
+        pids.sort_unstable();
+        pids
+    }
+
     #[test]
-    fn descendants_follow_parents_and_skip_zombies() {
+    fn descendants_follow_parents_and_skip_zombies_but_not_their_children() {
         let table = HashMap::from([
             (10, stat('S', 1, 100)),
             (11, stat('S', 10, 101)),
             (12, stat('Z', 10, 102)),
             (13, stat('R', 11, 103)),
+            (14, stat('S', 12, 104)),
             (20, stat('S', 1, 200)),
         ]);
-        let mut found = descendants(&table, 10);
-        found.sort_by_key(|process| process.pid);
-        assert_eq!(
-            found,
-            [
-                Process {
-                    pid: 10,
-                    start: 100
-                },
-                Process {
-                    pid: 11,
-                    start: 101
-                },
-                Process {
-                    pid: 13,
-                    start: 103
-                },
-            ]
-        );
+        let found = descendants(&table, 10);
+        // The command itself is not among them; it is signalled by pid.
+        assert!(found.iter().all(|entry| entry.process.pid != 10));
+        let unchanged = |pid: i32| table.get(&pid).copied();
+        let live = confirmed(&found, 10, unchanged);
+        assert_eq!(pids(&live), [11, 13, 14]);
         assert!(descendants(&table, 99).is_empty());
+    }
+
+    #[test]
+    fn children_of_a_reused_parent_pid_are_not_taken_for_the_commands() {
+        // 11 was the command's child when the table read it; by the time 12
+        // was read, 11 had exited and its pid belonged to another process,
+        // whose child 12 is.
+        let table = HashMap::from([
+            (10, stat('S', 1, 100)),
+            (11, stat('S', 10, 101)),
+            (12, stat('S', 11, 900)),
+        ]);
+        let found = descendants(&table, 10);
+        let now = HashMap::from([
+            (10, stat('S', 1, 100)),
+            (11, stat('S', 1, 899)),
+            (12, stat('S', 11, 900)),
+        ]);
+        let live = confirmed(&found, 10, |pid| now.get(&pid).copied());
+        assert!(live.is_empty(), "{live:?}");
+    }
+
+    #[test]
+    fn a_process_whose_pid_was_reused_since_the_table_is_dropped() {
+        let table = HashMap::from([(10, stat('S', 1, 100)), (11, stat('S', 10, 101))]);
+        let found = descendants(&table, 10);
+        let now = HashMap::from([(10, stat('S', 1, 100)), (11, stat('S', 10, 555))]);
+        assert!(confirmed(&found, 10, |pid| now.get(&pid).copied()).is_empty());
+        let same = confirmed(&found, 10, |pid| table.get(&pid).copied());
+        assert_eq!(same, [process(11, 101)]);
+    }
+
+    #[test]
+    fn this_process_is_ours_only_through_its_own_proc() {
+        let own = std::process::id() as i32;
+        let table = HashMap::from([(4242, stat('S', own, 1))]);
+        // Tests run with the host's or the container's own /proc.
+        assert!(proc_is_ours(&table, 4242));
+        let foreign = HashMap::from([(4242, stat('S', own + 1, 1))]);
+        assert!(!proc_is_ours(&foreign, 4242));
+        assert!(!proc_is_ours(&table, 4243));
     }
 
     #[test]

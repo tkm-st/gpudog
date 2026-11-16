@@ -74,9 +74,12 @@ as root. See [Logging](logging.md).
     `max_hold_ms` to bound how long a job can keep the GPUs others wait
     for (see [Hold limit](configuration.md#hold-limit)).
 *   `max_hold_ms` is enforced by `gpudog run`, which runs as the user. A
-    user who runs a modified client, or whose processes leave the
-    command's process tree, can hold GPUs past the limit. The daemon logs
-    such a reservation once and keeps it.
+    user can hold GPUs past the limit without any special tool: by killing
+    their own `gpudog` process (the command keeps the reservation), by
+    letting processes leave the command's process tree, or with a modified
+    client. The daemon logs such a reservation once and keeps it. It is a
+    limit for users who cooperate, like the rest of GPUDog (see
+    [What GPUDog does not do](../concepts.md#what-gpudog-does-not-do)).
 *   Also by design, anyone can start a process outside GPUDog on one of the
     GPUs a large waiting request needs. That request then keeps only the
     busy GPU and any GPU its own user is using, and smaller requests,
