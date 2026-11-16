@@ -5,8 +5,9 @@
 //! The daemon never revokes a reservation: a GPU is free only once the
 //! processes using it have exited, so stopping them is the client's job.
 //! Signalled are the processes descended from the command when the limit
-//! ends, those descended from the command or from any of them still alive
-//! during the grace period, and the command itself. A process that left the
+//! ends, those found descended from the command or from any of them still
+//! alive at the searches during the grace period (every [`SCAN`], whenever
+//! one of them exits, and before SIGKILL), and the command itself. A process that left the
 //! tree (its parent exited, or it double-forked) is not found.
 
 use std::collections::HashMap;
@@ -372,11 +373,14 @@ impl HoldLimit {
             let State::Stopping { targets, kill_at } = &mut self.state else {
                 return;
             };
-            if Instant::now() >= next_scan {
+            let before = targets.len();
+            targets.retain(|target| is_alive(*target));
+            // Also scan when a target has just exited: a process it started
+            // may still be found through it while it is a zombie, before
+            // that process is reparented and leaves the tree.
+            if Instant::now() >= next_scan || targets.len() < before {
                 grow(targets);
                 next_scan = Instant::now() + SCAN;
-            } else {
-                targets.retain(|target| is_alive(*target));
             }
             if targets.is_empty() {
                 self.state = State::Done;
