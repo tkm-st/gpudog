@@ -138,7 +138,10 @@ gpudog: the command was killed by signal 9 (SIGKILL)
     ended` line tells a stop at the limit apart from a `SIGTERM` someone
     sent.
 *   Processes the command started are stopped too, even if the command
-    itself exits first at `SIGTERM`. But the limit is enforced only while
+    itself exits first at `SIGTERM`. `gpudog` then waits for them until the
+    30 seconds end: a `SIGTERM` sent to `gpudog` meanwhile is not passed on,
+    and Ctrl-C reaches only those still in the terminal's foreground job.
+    Either way they get `SIGKILL` when the 30 seconds end. But the limit is enforced only while
     `gpudog` runs: if the command exits by itself before the limit, `gpudog`
     exits with it, and background processes it left behind are not stopped
     later (see
