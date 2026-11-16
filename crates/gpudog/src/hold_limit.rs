@@ -22,7 +22,8 @@ use crate::common::note;
 pub(crate) const GRACE: Duration = Duration::from_secs(30);
 
 /// Shortens [`GRACE`] for tests. Only a shorter value is honoured: a longer
-/// one would let a command outlive its limit by choice.
+/// one would let a command outlive its limit by choice. Documented for
+/// contributors in `docs/developer/building.md`, not for users.
 const GRACE_OVERRIDE: &str = "GPUDOG_TEST_HOLD_GRACE_MS";
 
 /// How often a stopped command's processes are checked while they exit.
