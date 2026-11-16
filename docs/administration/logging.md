@@ -53,9 +53,9 @@ uid=1001 gid=1001 pid=4300 denied: no GPU became available before the deadline
 
 With [`max_hold_ms`](configuration.md#hold-limit) set, a grant line ends
 with `hold_limit_ms=`. The `still holds its reservation` line is logged once,
-when the limit ends and the GPUs are still held. Normally `gpudog run` has
-just been told to stop its command and the `released` line follows within
-about 30 seconds. If it does not, a process that left the command's process
+when the limit ends and the GPUs are still held. Normally `gpudog run` is
+about to stop its command, a few milliseconds later, and the `released`
+line follows within about 30 seconds. If it does not, a process that left the command's process
 tree, or a client other than `gpudog run`, still holds the GPUs; see
 [A job holds GPUs too long](daemon.md#a-job-holds-gpus-too-long).
 
