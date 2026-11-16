@@ -27,7 +27,14 @@ pub(crate) const GRACE: Duration = Duration::from_secs(30);
 const GRACE_OVERRIDE: &str = "GPUDOG_TEST_HOLD_GRACE_MS";
 
 /// How often a stopped command's processes are checked while they exit.
+/// This reads only their own `/proc/<pid>/stat`.
 const POLL: Duration = Duration::from_millis(50);
+
+/// How often, during the grace period, `/proc` is searched for processes
+/// they have started. That reads every process on the host, so it runs
+/// less often than [`POLL`]; [`HoldLimit::on_deadline`] searches once more
+/// before SIGKILL.
+const SCAN: Duration = Duration::from_millis(500);
 
 fn grace() -> Duration {
     std::env::var(GRACE_OVERRIDE)
@@ -360,12 +367,18 @@ impl HoldLimit {
     /// for the rest of what was signalled, and kills whatever is left when
     /// the grace period ends. Their GPUs are not free until they exit.
     pub(crate) async fn finish(&mut self) {
+        let mut next_scan = Instant::now();
         loop {
             let State::Stopping { targets, kill_at } = &mut self.state else {
                 return;
             };
-            grow(targets);
-            if !targets.iter().any(|process| is_alive(*process)) {
+            if Instant::now() >= next_scan {
+                grow(targets);
+                next_scan = Instant::now() + SCAN;
+            } else {
+                targets.retain(|target| is_alive(*target));
+            }
+            if targets.is_empty() {
                 self.state = State::Done;
                 return;
             }
