@@ -4,9 +4,10 @@
 //!
 //! The daemon never revokes a reservation: a GPU is free only once the
 //! processes using it have exited, so stopping them is the client's job.
-//! Only processes descended from the command when the limit ends (or when
-//! the grace period ends) are signalled. A process that left the tree
-//! before then, for example by double-forking, is not found.
+//! Signalled are the processes descended from the command when the limit
+//! ends, those descended from the command or from any of them still alive
+//! during the grace period, and the command itself. A process that left the
+//! tree (its parent exited, or it double-forked) is not found.
 
 use std::collections::HashMap;
 use std::time::Duration;
@@ -149,12 +150,22 @@ fn descendants(table: &HashMap<i32, Stat>, root: i32) -> Vec<Found> {
 /// table is not one atomic snapshot: if a parent exited and its pid was
 /// reused while `/proc` was read, the new owner's children would otherwise
 /// look like the command's. A process whose parent exited in that window
-/// is dropped too; it is found again at the SIGKILL pass if the command
-/// still runs.
-fn confirmed(found: &[Found], root: i32, current: impl Fn(i32) -> Option<Stat>) -> Vec<Process> {
+/// is dropped too: it has been reparented, so it has left the tree and is
+/// not found again.
+///
+/// `root_start` is the root's recorded start time, checked like any other
+/// parent's; `None` for the command, an unreaped child whose pid cannot be
+/// reused.
+fn confirmed(
+    found: &[Found],
+    root: i32,
+    root_start: Option<u64>,
+    current: impl Fn(i32) -> Option<Stat>,
+) -> Vec<Process> {
+    let root_holds = root_start.is_none_or(|start| current(root).is_some_and(|s| s.start == start));
     let mut accepted: Vec<Found> = Vec::new();
     for entry in found {
-        let parent_holds = entry.ppid == root
+        let parent_holds = (entry.ppid == root && root_holds)
             || accepted.iter().any(|parent| {
                 parent.process.pid == entry.ppid
                     && current(entry.ppid).is_some_and(|stat| stat.start == parent.process.start)
@@ -195,6 +206,10 @@ fn proc_self_is_ours() -> bool {
 /// even after the command itself has exited. One that has already outlived
 /// the process that started it is reparented, and not found.
 fn grow(targets: &mut Vec<Process>) {
+    // A dead target can neither be signalled nor start anything, and a
+    // survivor that keeps starting short-lived processes would otherwise
+    // grow the list for the whole grace period.
+    targets.retain(|target| is_alive(*target));
     if targets.is_empty() || !proc_self_is_ours() {
         return;
     }
@@ -209,7 +224,8 @@ fn grow(targets: &mut Vec<Process>) {
         })
         .collect();
     for parent in parents {
-        for process in confirmed(&descendants(&table, parent.pid), parent.pid, stat_of) {
+        let found = descendants(&table, parent.pid);
+        for process in confirmed(&found, parent.pid, Some(parent.start), stat_of) {
             if !targets.contains(&process) {
                 targets.push(process);
             }
@@ -227,6 +243,7 @@ fn command_tree(command: Pid) -> Vec<Process> {
     confirmed(
         &descendants(&table, command.as_raw()),
         command.as_raw(),
+        None,
         stat_of,
     )
 }
@@ -237,8 +254,15 @@ fn is_alive(process: Process) -> bool {
 
 /// Signals the command itself. It is this process's child and has not been
 /// reaped while `command` is `Some`, so its pid cannot have been reused.
+///
+/// Returns true only if it was still running: `kill` also succeeds on a
+/// zombie, a command that has exited but that `gpudog` has not yet waited
+/// for.
 fn signal_command(command: Option<Pid>, signal: Signal) -> bool {
-    command.is_some_and(|pid| kill(pid, signal).is_ok())
+    command.is_some_and(|pid| {
+        let running = stat_of(pid.as_raw()).is_none_or(|stat| stat.state != 'Z');
+        kill(pid, signal).is_ok() && running
+    })
 }
 
 /// Sends `signal` to each process still alive as itself. Checking the
@@ -406,7 +430,7 @@ mod tests {
         // The command itself is not among them; it is signalled by pid.
         assert!(found.iter().all(|entry| entry.process.pid != 10));
         let unchanged = |pid: i32| table.get(&pid).copied();
-        let live = confirmed(&found, 10, unchanged);
+        let live = confirmed(&found, 10, None, unchanged);
         assert_eq!(pids(&live), [11, 13, 14]);
         assert!(descendants(&table, 99).is_empty());
     }
@@ -427,7 +451,7 @@ mod tests {
             (11, stat('S', 1, 899)),
             (12, stat('S', 11, 900)),
         ]);
-        let live = confirmed(&found, 10, |pid| now.get(&pid).copied());
+        let live = confirmed(&found, 10, None, |pid| now.get(&pid).copied());
         assert!(live.is_empty(), "{live:?}");
     }
 
@@ -436,8 +460,20 @@ mod tests {
         let table = HashMap::from([(10, stat('S', 1, 100)), (11, stat('S', 10, 101))]);
         let found = descendants(&table, 10);
         let now = HashMap::from([(10, stat('S', 1, 100)), (11, stat('S', 10, 555))]);
-        assert!(confirmed(&found, 10, |pid| now.get(&pid).copied()).is_empty());
-        let same = confirmed(&found, 10, |pid| table.get(&pid).copied());
+        assert!(confirmed(&found, 10, None, |pid| now.get(&pid).copied()).is_empty());
+        let same = confirmed(&found, 10, None, |pid| table.get(&pid).copied());
+        assert_eq!(same, [process(11, 101)]);
+    }
+
+    #[test]
+    fn a_survivor_root_whose_pid_was_reused_gives_no_children() {
+        // A survivor searched during the grace period is not this process's
+        // child, so its own pid can be reused while /proc is read.
+        let table = HashMap::from([(10, stat('S', 1, 100)), (11, stat('S', 10, 101))]);
+        let found = descendants(&table, 10);
+        let reused = HashMap::from([(10, stat('S', 1, 777)), (11, stat('S', 10, 101))]);
+        assert!(confirmed(&found, 10, Some(100), |pid| reused.get(&pid).copied()).is_empty());
+        let same = confirmed(&found, 10, Some(100), |pid| table.get(&pid).copied());
         assert_eq!(same, [process(11, 101)]);
     }
 

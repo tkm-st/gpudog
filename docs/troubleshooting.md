@@ -296,8 +296,10 @@ A stopped job (Ctrl-Z) also keeps its GPUs. Check `jobs` in the shell that
 started it.
 
 A command that hangs keeps its GPUs indefinitely, unless the administrator
-has set a [hold limit](user-guide/run.md#hold-limit): the daemon never takes
-GPUs back from a running job. Killing only `gpudog` does not help, because the
+has set a [hold limit](user-guide/run.md#hold-limit) and `gpudog run` is still
+running: the daemon never takes GPUs back from a running job. Background
+processes left behind by a command that has already exited are not stopped
+by the hold limit. Killing only `gpudog` does not help, because the
 command keeps the reservation. Find the command under the `gpudog` process
 with `ps -ef --forest` and stop it, for example with `kill <pid>`, then stop any
 processes it started. You can also ask an administrator; see

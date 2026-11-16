@@ -108,24 +108,44 @@ parent ends, which never happens; give it `-t`, or do not nest them.
 ## Hold limit
 
 The administrator can limit how long one `gpudog run` may keep its GPUs
-(`max_hold_ms`). There is no limit by default. With one, the `holding gpu(s)`
-line ends with it, for example `; hold limit 1d`, and `gpudog dash` shows it
-next to how long the GPUs have been held. The limit counts from the grant;
-time spent waiting does not count.
+(`max_hold_ms`). There is no limit by default, and it is the same for every
+user. To know it before you start, ask your administrator, or look at the
+`HELD` column of `gpudog dash` while other jobs run: a limit shows there after
+a slash. Once your GPUs are granted, the `holding gpu(s)` line ends with it,
+for example `; hold limit 1d`, in the units `--timeout` accepts
+(`1h30m`, `45s`). The limit counts from the grant; time spent waiting does
+not count.
 
 When the limit ends, `gpudog run` stops your command and every process it
-started:
+started. A job that ignores `SIGTERM` prints, for example:
 
 ```text
+gpudog: holding gpu(s) 0 (GPU-8f6a...); hold limit 1d
 gpudog: the hold limit of 1d has ended; stopping the command (SIGKILL in 30s)
+gpudog: the command did not stop after SIGTERM; sent SIGKILL
+gpudog: the command was killed by signal 9 (SIGKILL)
 ```
 
-*   They first get `SIGTERM`. Save a checkpoint and exit when it arrives.
-*   Those still running 30 seconds later get `SIGKILL`, and `gpudog` prints
-    `gpudog: the command did not stop after SIGTERM; sent SIGKILL`.
+*   They first get `SIGTERM`. A command that then exits ends with
+    `gpudog: the command was killed by signal 15 (SIGTERM)`, or with its own
+    status if it handles the signal.
+*   Those still running 30 seconds later get `SIGKILL`. The 30 seconds are
+    fixed and cannot be changed, which may be too short to save a large
+    model: save checkpoints regularly, and treat `SIGTERM` as the last
+    chance to finish one that is already being written.
 *   `gpudog` returns the command's status as usual: `143` for `SIGTERM`,
     `137` for `SIGKILL`, or the command's own status if it exits by itself
-    (see [Exit status](#exit-status)).
+    (see [Exit status](#exit-status)). Only the `the hold limit of ... has
+    ended` line tells a stop at the limit apart from a `SIGTERM` someone
+    sent.
+*   Processes the command started are stopped too, even if the command
+    itself exits first at `SIGTERM`. But the limit is enforced only while
+    `gpudog` runs: if the command exits by itself before the limit, `gpudog`
+    exits with it, and background processes it left behind are not stopped
+    later (see
+    [My GPUs were not released](../troubleshooting.md#my-gpus-were-not-released)).
+*   The limit is kept by `gpudog run` itself, so it still applies if the
+    daemon restarts while your command runs.
 *   A process that has left your command's process tree is not stopped. It
     keeps the GPUs until it exits, and the daemon logs it. This happens to a
     daemon that forked twice, and to a process started during the 30
@@ -170,6 +190,7 @@ to the first number. Your command sees these GPUs as its CUDA numbers `0`,
 | -- | -- |
 | The command ran | The command's own exit status |
 | The command was killed by signal *N* | 128 + *N*, with `gpudog: the command was killed by signal N (SIGNAME)` (see below) |
+| The command was stopped at its [hold limit](#hold-limit) | As above, usually `143` or `137`, after `gpudog: the hold limit of ... has ended` |
 | The command was not found (`cannot run ...`) | `127` |
 | The command is not executable | `126` |
 | Invalid command-line syntax, missing command or conflicting options | `2` |
@@ -199,7 +220,7 @@ holds the reservation, has exited (see [Reservations](../concepts.md#reservation
     not exit on them; it keeps waiting while the command cleans up.
 *   `SIGTERM` sent to `gpudog` is forwarded to the command itself, every time
     it arrives. Processes the command started do not receive it from
-    `gpudog`. If the command is a wrapper script, start the real program with
+    `gpudog`; only the [hold limit](#hold-limit) signals them as well. If the command is a wrapper script, start the real program with
     `exec` (for example `exec python train.py`) so that it receives `SIGTERM`.
 *   A signal that was already ignored when `gpudog` started, for example
     `SIGHUP` under `nohup gpudog run ...`, stays ignored for the command.

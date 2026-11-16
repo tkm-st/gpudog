@@ -33,7 +33,7 @@
 | `watch_unmanaged_ms` | integer (1–3,600,000) | `1000` | GPU process observation interval; waiting is always enabled. Failures pause new grants, not running jobs. |
 | `max_held_per_uid` | integer (1–1,000,000) | `8` | Maximum GPUs one user may hold at once. Set it below the number of GPUs if one user's large request must not be able to keep the whole machine idle while it waits (see [Security](security.md#untrusted-input)). |
 | `max_queued_per_uid` | integer (1–1,000,000) | `8` | Maximum requests one user may have waiting at once. |
-| `max_hold_ms` | integer (0–4,294,967,295) | `0` | Milliseconds one request may hold its GPUs, counted from the grant. `0` means no limit. See [Hold limit](#hold-limit). |
+| `max_hold_ms` | integer (0–4,294,967,295, about 49.7 days) | `0` | Milliseconds one request may hold its GPUs, counted from the grant. `0` means no limit. See [Hold limit](#hold-limit). |
 | `devices` | array of strings | all GPUs | GPUs this daemon manages, as `GPU-<uuid>` strings from `nvidia-smi -L`. See [Managing some GPUs](#managing-some-gpus). |
 
 A value of `0` for a limit stops startup, except for `max_hold_ms`, where
@@ -55,6 +55,11 @@ example, to stop jobs after 24 hours:
 ```toml
 max_hold_ms = 86400000
 ```
+
+Choose a value longer than the jobs your users normally run, and tell them
+before you set it: jobs that reach it are stopped, with 30 seconds to save
+their state, so users need to checkpoint and resume within it. Users can see
+it only once their GPUs are granted, or in `gpudog dash` next to other jobs.
 
 *   The daemon sends the limit with each grant. When it ends, `gpudog run`
     sends `SIGTERM` to the command and every process the command started,

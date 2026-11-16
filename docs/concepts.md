@@ -119,7 +119,7 @@ needs from the requests behind it while it waits for another user's job to
 end. That is what keeps large requests from waiting forever, and
 `max_held_per_uid` limits how large it can be. If that job runs for days,
 those GPUs stay idle for days, unless the administrator has set a
-[hold limit](#per-user-limits). Someone who already uses many GPUs can wait
+[hold limit](#hold-limit). Someone who already uses many GPUs can wait
 a long time while users who use fewer keep arriving.
 
 ## Per-user limits
@@ -137,9 +137,11 @@ with the GPUs you already hold. The
 administrator can change these values in
 [the configuration](administration/configuration.md).
 
-The administrator can also set a **hold limit**: how long one
-`gpudog run` may keep its GPUs. There is none by default. With one,
-`gpudog run` stops your command when it ends; see
+## Hold limit
+
+The administrator can also set a hold limit: how long one `gpudog run` may
+keep its GPUs, the same for every user and every run. There is none by
+default. With one, `gpudog run` stops your command when it ends; see
 [Hold limit](user-guide/run.md#hold-limit).
 
 ## Identity
