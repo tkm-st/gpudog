@@ -141,8 +141,8 @@ gpudog: the command was killed by signal 9 (SIGKILL)
     itself exits first at `SIGTERM`.
 *   If the command has exited but processes it started are still running,
     `gpudog` waits until they have all exited, and at most until the 30
-    seconds end. Meanwhile `gpudog` keeps waiting whatever you send it: a
-    `SIGTERM` is not passed on, and Ctrl-C usually does not stop processes
+    seconds end. Meanwhile `gpudog` keeps waiting through `SIGTERM`, Ctrl-C,
+    Ctrl-\ and a closed terminal: a `SIGTERM` is not passed on, and Ctrl-C usually does not stop processes
     started in the background with `&`. Those still running get
     `SIGKILL` when the 30 seconds end; to stop them sooner, `kill` them
     yourself.
