@@ -56,6 +56,10 @@ example, to stop jobs after 24 hours:
 max_hold_ms = 86400000
 ```
 
+A value above the upper bound is ignored with a warning at startup, which
+leaves no limit at all; check the journal after setting it (a reload refuses
+such a file instead).
+
 Choose a value longer than the jobs your users normally run, and tell them
 before you set it: jobs that reach it are stopped, with 30 seconds to save
 their state, so users need to checkpoint and resume within it. Users can see

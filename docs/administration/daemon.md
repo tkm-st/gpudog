@@ -148,12 +148,16 @@ Debian package does not restart the daemon for this reason; see
 The daemon never takes GPUs back from a running job, even one that hangs.
 To stop jobs after a fixed time, set
 [`max_hold_ms`](configuration.md#hold-limit): `gpudog run` then stops its
-command when the limit ends. A reservation still held after its limit is
-logged once; to find them:
+command when the limit ends. Every reservation that reaches its limit is
+logged once, as an info line:
 
 ```shell-session
 $ journalctl -u gpudogd -g 'still holds its reservation'
 ```
+
+Normally the `released its reservation` line for the same `pid=` follows
+within about 30 seconds. One that does not is still held; find its processes
+as described below.
 
 `gpudog dash` shows the uid and the pid of the `gpudog` process for each
 reservation. For a daemon in a container, read the pid as described in

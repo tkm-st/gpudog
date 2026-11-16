@@ -112,8 +112,7 @@ The administrator can limit how long one `gpudog run` may keep its GPUs
 user. To know it before you start, ask your administrator, or look at the
 `HELD` column of `gpudog dash` while other jobs run: a limit shows there after
 a slash. Once your GPUs are granted, the `holding gpu(s)` line ends with it,
-for example `; hold limit 1d`, in the units `--timeout` accepts
-(`1h30m`, `45s`). The limit counts from the grant; time spent waiting does
+for example `; hold limit 1d` or `; hold limit 1h30m`. The limit counts from the grant; time spent waiting does
 not count.
 
 When the limit ends, `gpudog run` stops your command and every process it
@@ -126,7 +125,7 @@ gpudog: the command did not stop after SIGTERM; sent SIGKILL
 gpudog: the command was killed by signal 9 (SIGKILL)
 ```
 
-*   They first get `SIGTERM`. A command that then exits ends with
+*   The command and those processes first get `SIGTERM`. A command that then exits ends with
     `gpudog: the command was killed by signal 15 (SIGTERM)`, or with its own
     status if it handles the signal.
 *   Those still running 30 seconds later get `SIGKILL`. The 30 seconds are
@@ -145,11 +144,13 @@ gpudog: the command was killed by signal 9 (SIGKILL)
     later (see
     [My GPUs were not released](../troubleshooting.md#my-gpus-were-not-released)).
 *   The limit is kept by `gpudog run` itself, so it still applies if the
-    daemon restarts while your command runs.
+    daemon restarts while your command runs, although the GPUs are then no
+    longer reserved for it (see [Signals](#signals)).
 *   A process that has left your command's process tree is not stopped. It
-    keeps the GPUs until it exits, and the daemon logs it. This happens to a
-    daemon that forked twice, and to a process started during the 30
-    seconds whose parent then exits before `SIGKILL` is sent.
+    keeps the GPUs until it exits, and `gpudogd` logs it. This happens to a
+    program that runs itself in the background by forking twice, and to a
+    process started during the 30 seconds whose parent then exits before
+    `SIGKILL` is sent.
 *   A job stopped with Ctrl-Z keeps its GPUs, and `gpudog` is stopped with
     it. If the limit ends meanwhile, the command is stopped as soon as the
     job continues.

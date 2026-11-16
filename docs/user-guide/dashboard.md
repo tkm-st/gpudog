@@ -24,7 +24,7 @@ GPUDog: 3 GPUs, 1 free, 1 waiting (refreshes every 5s)
 Observation: 412ms ago (interval 1000ms).
 
 In use
-  GPUS  UID   PID    HELD             COMMAND
+  GPUS  UID   PID    HELD            COMMAND
   0     1001  52114  1h 12m / 1d 0h  python train.py
 
 Waiting
@@ -53,8 +53,11 @@ The sections are:
     new request, and how many requests are waiting.
 *   **In use**: reservations that hold GPUs, with how long they have held them.
     With a [hold limit](run.md#hold-limit), `HELD` shows it after a slash,
-    in the same units as the time held: `1h 12m / 1d 0h` has held its GPUs
-    for 1h 12m of a 1-day limit. Without one, only the time held is shown.
+    in the same two units as the time held: `1h 12m / 1d 0h` has held its
+    GPUs for 1h 12m of a 1-day limit, the limit `gpudog run` prints as `1d`.
+    A job past its limit is not marked; its time held is simply the larger
+    one, as in `1d 2h / 1d 0h`. Without a limit, only the time held is
+    shown.
 *   **Waiting**: queued requests in queue order, with how many GPUs each wants.
 *   **GPU processes**: every process the daemon sees using a GPU, including
     processes started without `gpudog`.

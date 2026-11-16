@@ -140,8 +140,7 @@ administrator can change these values in
 ## Hold limit
 
 The administrator can also set a hold limit: how long one `gpudog run` may
-keep its GPUs, the same for every user and every run. There is none by
-default. With one, `gpudog run` stops your command when it ends; see
+keep its GPUs, the same for every user. There is none by default. With one, `gpudog run` stops your command when it ends; see
 [Hold limit](user-guide/run.md#hold-limit).
 
 ## Identity
