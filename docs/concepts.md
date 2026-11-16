@@ -118,7 +118,8 @@ A large request from a user who uses nothing still keeps every free GPU it
 needs from the requests behind it while it waits for another user's job to
 end. That is what keeps large requests from waiting forever, and
 `max_held_per_uid` limits how large it can be. If that job runs for days,
-those GPUs stay idle for days. Someone who already uses many GPUs can wait
+those GPUs stay idle for days, unless the administrator has set a
+[hold limit](#per-user-limits). Someone who already uses many GPUs can wait
 a long time while users who use fewer keep arriving.
 
 ## Per-user limits
@@ -136,6 +137,11 @@ with the GPUs you already hold. The
 administrator can change these values in
 [the configuration](administration/configuration.md).
 
+The administrator can also set a **hold limit**: how long one
+`gpudog run` may keep its GPUs. There is none by default. With one,
+`gpudog run` stops your command when it ends; see
+[Hold limit](user-guide/run.md#hold-limit).
+
 ## Identity
 
 The daemon identifies users by the uid that the kernel reports for the socket
@@ -152,7 +158,8 @@ a GPU, but it cannot stop a user who deliberately bypasses it:
     A GPU in use by such a process is not granted, so your request waits even
     if no reservation holds it. If the daemon cannot check GPU usage, it stops
     granting new reservations until it can; running jobs are not affected.
-    The daemon never stops other processes. See
+    The daemon never stops any process; only `gpudog run` stops its own
+    command, at a [hold limit](user-guide/run.md#hold-limit). See
     [Unmanaged processes](administration/unmanaged-processes.md).
 *   GPUs are allocated whole. GPU sharing is not supported, and MIG instances
     or GPUs with MIG enabled are rejected.

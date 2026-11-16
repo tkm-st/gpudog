@@ -70,7 +70,13 @@ as root. See [Logging](logging.md).
     up to `max_held_per_uid`, while one of them is held by another user's
     job. The free ones are then kept for that request until the job ends,
     however long that is. Set `max_held_per_uid` below the number of GPUs
-    if one user must not be able to keep a whole machine idle.
+    if one user must not be able to keep a whole machine idle, and
+    `max_hold_ms` to bound how long a job can keep the GPUs others wait
+    for (see [Hold limit](configuration.md#hold-limit)).
+*   `max_hold_ms` is enforced by `gpudog run`, which runs as the user. A
+    user who runs a modified client, or whose processes leave the
+    command's process tree, can hold GPUs past the limit. The daemon logs
+    such a reservation once and keeps it.
 *   Also by design, anyone can start a process outside GPUDog on one of the
     GPUs a large waiting request needs. That request then keeps only the
     busy GPU and any GPU its own user is using, and smaller requests,

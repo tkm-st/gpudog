@@ -295,12 +295,20 @@ shows the pid of the `gpudog` process; look for its descendants with
 A stopped job (Ctrl-Z) also keeps its GPUs. Check `jobs` in the shell that
 started it.
 
-A command that hangs keeps its GPUs indefinitely: the daemon never takes GPUs
-back from a running job. Killing only `gpudog` does not help, because the
+A command that hangs keeps its GPUs indefinitely, unless the administrator
+has set a [hold limit](user-guide/run.md#hold-limit): the daemon never takes
+GPUs back from a running job. Killing only `gpudog` does not help, because the
 command keeps the reservation. Find the command under the `gpudog` process
 with `ps -ef --forest` and stop it, for example with `kill <pid>`, then stop any
 processes it started. You can also ask an administrator; see
 [A job holds GPUs too long](administration/daemon.md#a-job-holds-gpus-too-long).
+
+## `the hold limit of ... has ended; stopping the command`
+
+The administrator has set a hold limit, and your command reached it.
+`gpudog run` stopped it with `SIGTERM`, and with `SIGKILL` 30 seconds later
+if it was still running. Split long jobs so that each run fits the limit and
+resumes from a checkpoint; see [Hold limit](user-guide/run.md#hold-limit).
 
 ## `gpudog run` keeps waiting after its timeout
 

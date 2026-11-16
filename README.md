@@ -24,7 +24,8 @@ reservations and observed GPU processes.
 GPUDog is not a batch scheduler and does not enforce isolation. It
 coordinates users who agree to cooperate. The daemon observes GPU processes
 without stopping them, waits before allocating a GPU observed in use, and
-pauses new grants when observation fails. Running jobs are not revoked.
+pauses new grants when observation fails. Running jobs are not revoked; an
+optional hold limit makes `gpudog run` stop its own command after a set time.
 External processes can still start after a sample; this is not access control.
 
 Changes and known limitations are listed in [`CHANGELOG.md`](CHANGELOG.md).

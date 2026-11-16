@@ -33,10 +33,12 @@
 | `watch_unmanaged_ms` | integer (1–3,600,000) | `1000` | GPU process observation interval; waiting is always enabled. Failures pause new grants, not running jobs. |
 | `max_held_per_uid` | integer (1–1,000,000) | `8` | Maximum GPUs one user may hold at once. Set it below the number of GPUs if one user's large request must not be able to keep the whole machine idle while it waits (see [Security](security.md#untrusted-input)). |
 | `max_queued_per_uid` | integer (1–1,000,000) | `8` | Maximum requests one user may have waiting at once. |
+| `max_hold_ms` | integer (0–4,294,967,295) | `0` | Milliseconds one request may hold its GPUs, counted from the grant. `0` means no limit. See [Hold limit](#hold-limit). |
 | `devices` | array of strings | all GPUs | GPUs this daemon manages, as `GPU-<uuid>` strings from `nvidia-smi -L`. See [Managing some GPUs](#managing-some-gpus). |
 
-A value of `0` for a limit stops startup. A negative value, or one above
-the upper bound, is ignored with a warning, and the default is used.
+A value of `0` for a limit stops startup, except for `max_hold_ms`, where
+`0` means no limit. A negative value, or one above the upper bound, is
+ignored with a warning, and the default is used.
 
 ## Example
 
@@ -44,6 +46,30 @@ the upper bound, is ignored with a warning, and the default is used.
 max_held_per_uid = 4
 max_queued_per_uid = 4
 ```
+
+## Hold limit
+
+`max_hold_ms` limits how long one `gpudog run` may keep its GPUs. For
+example, to stop jobs after 24 hours:
+
+```toml
+max_hold_ms = 86400000
+```
+
+*   The daemon sends the limit with each grant. When it ends, `gpudog run`
+    sends `SIGTERM` to the command and every process the command started,
+    then `SIGKILL` to those still running 30 seconds later. The GPUs are
+    free once they have exited.
+*   The daemon itself never stops a process or takes GPUs back. A
+    reservation still held after its limit (for example by a process that
+    left the command's process tree, or by a client that does not stop its
+    command) is logged once and kept until it is released; see
+    [Request lines](logging.md#request-lines).
+*   The limit applies to every user alike, whether or not anyone is waiting.
+*   It counts from the grant, not from when the request was queued. Waiting
+    time is limited by `gpudog run -t` instead.
+*   A reload changes the limit for later grants only. Jobs that already
+    hold GPUs keep the limit they were given.
 
 ## Managing some GPUs
 
@@ -106,7 +132,8 @@ $ docker kill -s HUP gpudogd       # Docker
 
 *   These settings take effect at once, for new connections, requests and
     observations: `max_connections`, `max_connections_per_uid`, `handshake_timeout_ms`, `watch_unmanaged_ms`,
-    `max_held_per_uid` and `max_queued_per_uid`. The log shows what changed,
+    `max_held_per_uid`, `max_queued_per_uid` and `max_hold_ms` (for later
+    grants only). The log shows what changed,
     for example `configuration reloaded: max_held_per_uid 8 -> 4`.
 *   A changed `devices` takes effect at once too, as
     `configuration reloaded: devices`, with one log line per GPU added

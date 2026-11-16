@@ -51,7 +51,10 @@ child inherits the open fd
 last fd closes -----------------> release/cancel and pump queue
 ```
 
-One connection holds at most one reservation. Every pre-acquire read/write
+One connection holds at most one reservation. A grant carries the hold
+limit (`max_hold_ms`) read under the lock that granted it. The client, not
+the daemon, stops the command when it ends; the daemon's held session only
+logs once that the limit passed and keeps waiting for the fd to close. Every pre-acquire read/write
 is bounded by the handshake timeout; held and queued connections wait as
 long as needed. Connection, per-user held-GPU and queued-request caps bound
 resource use. `SessionGuard::drop` releases state even on task cancellation.

@@ -25,8 +25,21 @@ release's section.
 
 ## [0.0.2] - Unreleased
 
-### Changed
-
+*   `max_hold_ms` in `config.toml`: how long one request may hold its GPUs,
+    counted from the grant. The default, `0`, means no limit. A reload
+    applies it to later grants only.
+*   With a hold limit, `gpudog run` ends its `holding gpu(s)` line with
+    `; hold limit <duration>`. When the limit ends it prints
+    `the hold limit of <duration> has ended; stopping the command (SIGKILL in 30s)`,
+    sends `SIGTERM` to the command and its descendants, and sends `SIGKILL`
+    to those left 30 seconds later, printing
+    `the command did not stop after SIGTERM; sent SIGKILL`.
+*   The daemon's grant line ends with `hold_limit_ms=<ms>` when there is a
+    limit, and a reservation still held when its limit ends is logged once:
+    `still holds its reservation after its hold limit of <ms> ms; it is kept until the client closes it`.
+    The daemon never revokes it.
+*   `gpudog dash` shows a holder's hold limit in the `HELD` column, as
+    `<held> / <limit>`.
 *   Wire protocol version 7. `granted` and each `reservation` entry of
     `status_reply` carry a `hold_limit_ms`. Clients and daemons of version 6
     refuse each other with `protocol version mismatch`; upgrade both.

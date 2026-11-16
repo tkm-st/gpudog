@@ -79,6 +79,12 @@ close-on-exec, breaks the lock.
 *   Requests that can never succeed are denied at once, not queued.
 *   Timeouts are enforced by the daemon. A request that times out is denied
     with `timed_out`.
+*   The hold limit (`max_hold_ms`) is read at each grant and sent as
+    `granted.hold_limit_ms`. `gpudog run` enforces it: `SIGTERM` to the
+    command's process tree (found through `/proc` by parent pid and start
+    time), then `SIGKILL` after 30 seconds. The daemon logs a reservation
+    held past its limit once and never revokes it, since a revoked GPU
+    would still be busy with the job's processes.
 *   Per-user limits on connections, held GPUs and queued requests.
 
 ## Device identity

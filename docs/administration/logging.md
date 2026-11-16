@@ -46,8 +46,18 @@ Each request line starts with the client's kernel-reported
 uid=1000 gid=1000 pid=4242 acquire num_gpus=1 candidates=[GPU-...] command=...
 uid=1000 gid=1000 pid=4242 granted gpus=[0:GPU-...]
 uid=1000 gid=1000 pid=4242 released its reservation
+uid=1002 gid=1002 pid=4400 granted gpus=[1:GPU-...] hold_limit_ms=86400000
+uid=1002 gid=1002 pid=4400 still holds its reservation after its hold limit of 86400000 ms; it is kept until the client closes it
 uid=1001 gid=1001 pid=4300 denied: no GPU became available before the deadline
 ```
+
+With [`max_hold_ms`](configuration.md#hold-limit) set, a grant line ends
+with `hold_limit_ms=`. The `still holds its reservation` line is logged once,
+when the limit ends and the GPUs are still held. Normally `gpudog run` has
+just been told to stop its command and the `released` line follows within
+about 30 seconds. If it does not, a process that left the command's process
+tree, or a client other than `gpudog run`, still holds the GPUs; see
+[A job holds GPUs too long](daemon.md#a-job-holds-gpus-too-long).
 
 `released its reservation` also ends a request that was cancelled while it
 waited. A request whose `-t` ran out normally ends with the `denied` line

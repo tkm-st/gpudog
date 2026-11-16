@@ -105,6 +105,33 @@ remove the option. A `gpudog run` inside
 another `gpudog run` that asks for the GPUs its parent holds waits until the
 parent ends, which never happens; give it `-t`, or do not nest them.
 
+## Hold limit
+
+The administrator can limit how long one `gpudog run` may keep its GPUs
+(`max_hold_ms`). There is no limit by default. With one, the `holding gpu(s)`
+line ends with it, for example `; hold limit 1d`, and `gpudog dash` shows it
+next to how long the GPUs have been held. The limit counts from the grant;
+time spent waiting does not count.
+
+When the limit ends, `gpudog run` stops your command and every process it
+started:
+
+```text
+gpudog: the hold limit of 1d has ended; stopping the command (SIGKILL in 30s)
+```
+
+*   They first get `SIGTERM`. Save a checkpoint and exit when it arrives.
+*   Those still running 30 seconds later get `SIGKILL`, and `gpudog` prints
+    `gpudog: the command did not stop after SIGTERM; sent SIGKILL`.
+*   `gpudog` returns the command's status as usual: `143` for `SIGTERM`,
+    `137` for `SIGKILL`, or the command's own status if it exits by itself
+    (see [Exit status](#exit-status)).
+*   A process that has left your command's process tree, for example a
+    daemon that forked twice, is not stopped. It keeps the GPUs until it
+    exits, and the daemon logs it.
+*   For a shorter limit of your own, run the command under `timeout`, for
+    example `gpudog run -- timeout 2h python train.py`.
+
 ## Output
 
 `gpudog` writes its own messages to standard error, so they do not mix with
@@ -114,6 +141,9 @@ your program's standard output:
 gpudog: waiting for GPUs (queue position 0)
 gpudog: holding gpu(s) 0,1 (GPU-8f6a...,GPU-1c2d...)
 ```
+
+With a [hold limit](#hold-limit), the second line ends with it:
+`gpudog: holding gpu(s) 0,1 (GPU-8f6a...,GPU-1c2d...); hold limit 1d`.
 
 The waiting line is printed once, when the request is queued. The position
 starts at `0`, the first request the daemon considers. It can change while

@@ -11,7 +11,10 @@ Implemented: `gpudogd`, `gpudog run` (`-n/-g/-t`), `health`, terminal
 `dash`, config loading (SIGHUP reloads the limits and `devices`; socket
 keys need a restart), stderr/journal logging, Debian packaging and the
 Docker image. Protocol version is **7**. GPU process observation and
-PID/start-time process-tree classification run in the daemon. Observed usage
+PID/start-time process-tree classification run in the daemon. `max_hold_ms` sets a
+hold limit that the daemon sends with each grant and `gpudog run` enforces
+on its command's process tree; the daemon only logs an overdue reservation.
+Observed usage
 blocks new grants independently of labels; failures/staleness pause new
 allocation without stopping jobs or queue deadlines. `watch_unmanaged_ms`
 defaults to 1000 and waiting is always enabled. Clients choose no priority:
