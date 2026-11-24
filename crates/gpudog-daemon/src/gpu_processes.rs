@@ -7,14 +7,14 @@
 //! regardless of classification. Dash consumes daemon snapshots; clients
 //! never query their own unrelated NVML/procfs process view.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::io::Read;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
 use nvml_wrapper::enums::device::UsedGpuMemory;
 use nvml_wrapper::error::NvmlError as RawNvmlError;
-use nvml_wrapper::struct_wrappers::device::ProcessInfo;
+use nvml_wrapper::struct_wrappers::device::{ProcessInfo, ProcessUtilizationSample};
 use nvml_wrapper::Nvml;
 
 use gpudog_core::nvml::{load_nvml, NvmlError};
@@ -48,6 +48,43 @@ pub trait GpuProcessSource: Send + Sync {
 pub struct NvmlProcessSource {
     nvml: Nvml,
     selected: Option<Vec<String>>,
+    /// Per GPU UUID, the newest utilization sample already read, so each
+    /// query reads only the samples taken since the previous one.
+    last_sample: Mutex<HashMap<String, u64>>,
+}
+
+/// Highest SM utilization per pid in one utilization query, or `None` when
+/// the GPU does not report it. `newest` is the timestamp to ask from next.
+#[derive(Debug, Default, PartialEq, Eq)]
+struct Utilization {
+    peaks: Option<HashMap<u32, u32>>,
+    newest: Option<u64>,
+}
+
+/// Reads one `nvmlDeviceGetProcessUtilization` result. NVML lists only
+/// processes that used the GPU during the period and answers `NotFound`
+/// when none did, so a missing process ran at 0%. Any other error means
+/// the figure is unknown, and the caller falls back to whether a process is
+/// there at all. Values above 100 are clamped: this is driver input.
+fn utilization(result: Result<Vec<ProcessUtilizationSample>, RawNvmlError>) -> Utilization {
+    match result {
+        Ok(samples) => {
+            let mut peaks = HashMap::new();
+            for sample in &samples {
+                let peak = peaks.entry(sample.pid).or_insert(0);
+                *peak = sample.sm_util.min(100).max(*peak);
+            }
+            Utilization {
+                peaks: Some(peaks),
+                newest: samples.iter().map(|sample| sample.timestamp).max(),
+            }
+        }
+        Err(RawNvmlError::NotFound) => Utilization {
+            peaks: Some(HashMap::new()),
+            newest: None,
+        },
+        Err(_) => Utilization::default(),
+    }
 }
 
 impl NvmlProcessSource {
@@ -55,6 +92,7 @@ impl NvmlProcessSource {
         Ok(Self {
             nvml: load_nvml()?,
             selected: None,
+            last_sample: Mutex::default(),
         })
     }
 
@@ -62,6 +100,7 @@ impl NvmlProcessSource {
         Ok(Self {
             nvml: load_nvml()?,
             selected: Some(uuids),
+            last_sample: Mutex::default(),
         })
     }
 }
@@ -129,6 +168,21 @@ impl NvmlProcessSource {
                     )))
                 }
             };
+            let since = self
+                .last_sample
+                .lock()
+                .ok()
+                .and_then(|last| last.get(&uuid).copied());
+            let usage = utilization(device.process_utilization_stats(since));
+            if let (Some(newest), Ok(mut last)) = (usage.newest, self.last_sample.lock()) {
+                last.insert(uuid.clone(), newest);
+            }
+            let percent = |pid: u32| {
+                usage
+                    .peaks
+                    .as_ref()
+                    .map(|peaks| peaks.get(&pid).copied().unwrap_or(0))
+            };
             // A process can appear in both lists; one row per (GPU, pid).
             let start = found.len();
             for info in compute.iter().chain(&graphics) {
@@ -142,7 +196,7 @@ impl NvmlProcessSource {
                         gpu_uuid: uuid.clone(),
                         pid: info.pid,
                         used_memory: used,
-                        sm_utilization: None,
+                        sm_utilization: percent(info.pid),
                     }),
                 }
             }

@@ -399,3 +399,43 @@ fn a_roots_own_children_are_read_before_its_known_processes() {
     assert!(collected.facts.contains_key(&11), "{:?}", pids(&collected));
     assert!(collected.truncated.is_some());
 }
+
+fn sample(pid: u32, timestamp: u64, sm_util: u32) -> ProcessUtilizationSample {
+    ProcessUtilizationSample {
+        pid,
+        timestamp,
+        sm_util,
+        mem_util: 0,
+        enc_util: 0,
+        dec_util: 0,
+    }
+}
+
+#[test]
+fn utilization_keeps_each_processes_peak_and_the_newest_sample() {
+    let usage = utilization(Ok(vec![
+        sample(10, 5, 30),
+        sample(10, 9, 70),
+        sample(11, 7, 400),
+        sample(10, 8, 20),
+    ]));
+    assert_eq!(usage.newest, Some(9));
+    assert_eq!(usage.peaks, Some(HashMap::from([(10, 70), (11, 100)])));
+}
+
+#[test]
+fn no_samples_mean_every_process_was_at_zero() {
+    for result in [Ok(vec![]), Err(RawNvmlError::NotFound)] {
+        let usage = utilization(result);
+        assert_eq!(usage.peaks, Some(HashMap::new()));
+        assert_eq!(usage.newest, None);
+    }
+}
+
+#[test]
+fn unsupported_utilization_is_unknown() {
+    assert_eq!(
+        utilization(Err(RawNvmlError::NotSupported)),
+        Utilization::default()
+    );
+}
