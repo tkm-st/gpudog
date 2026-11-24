@@ -176,7 +176,9 @@ gpudog: the command was killed by signal 9 (SIGKILL)
 The administrator can also stop jobs whose GPUs stay idle too long
 (`idle_stop_ms`). There is none by default. With one, the `holding gpu(s)`
 line ends with it, for example `; idle limit 30m`, and `gpudog dash` shows
-how long each job's GPUs have been idle in its `IDLE` column.
+how long each job's GPUs have been idle in its `IDLE` column. To know the
+limit before you start, ask your administrator, or look at that column
+while other jobs run.
 
 Your GPUs count as idle while none of your command's processes runs on
 them, or while those that do run do (almost) no work on them (compute,
@@ -271,7 +273,7 @@ holds the reservation, has exited (see [Reservations](../concepts.md#reservation
     it arrives. Processes the command started do not receive it from
     `gpudog`; only the [hold limit](#hold-limit) and the
     [idle limit](#idle-limit) signal them as well. Once
-    the command has exited after a hold-limit stop, `SIGTERM` is not
+    the command has exited after a hold- or idle-limit stop, `SIGTERM` is not
     forwarded and `gpudog` keeps waiting (see [Hold limit](#hold-limit)). If the command is a wrapper script, start the real program with
     `exec` (for example `exec python train.py`) so that it receives `SIGTERM`.
 *   A signal that was already ignored when `gpudog` started, for example

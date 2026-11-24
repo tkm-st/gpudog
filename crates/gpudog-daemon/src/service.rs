@@ -2036,8 +2036,8 @@ async fn send_idle_stop(shared: &Shared, line: &mut Line, peer: &PeerCredentials
         Ok(Ok(())) => shared.log(
             LogLevel::Access,
             &format!(
-                "{peer} idle for {idle_ms} ms; asked the client to stop its command, \
-                 and keeps the reservation until the client closes it"
+                "{peer} idle for {idle_ms} ms; asked the client to stop its command; \
+                 the reservation is kept until the client closes it"
             ),
         ),
         Ok(Err(error)) => {

@@ -93,7 +93,8 @@ example, to stop a job whose GPUs have been idle for 30 minutes:
 idle_stop_ms = 1800000
 ```
 
-A job is idle while either of these holds on every GPU it was granted:
+A job is idle while, on each GPU it was granted, one of these holds (not
+necessarily the same one on every GPU):
 
 *   None of its processes runs on its GPUs. This includes the time before
     the job first uses them, for example while it loads data: the idle time
@@ -105,8 +106,10 @@ A job is idle while either of these holds on every GPU it was granted:
     previous observation counts as idle.
 
 The idle time starts again whenever the job uses one of its GPUs. Choose a
-value longer than the jobs your users take to start (30 minutes or more is
-a reasonable start), and tell them before you set it. The shortest limit
+value longer than any phase in which your users' jobs leave their GPUs
+alone: starting up and loading data, but also evaluation on the CPU,
+writing large checkpoints or preprocessing between epochs (30 minutes or
+more is a reasonable start). Tell your users before you set it. The shortest limit
 is one minute: a value from 1 to 59,999 is ignored with a warning at
 startup, which leaves idle stop off, and refused on reload.
 
@@ -144,7 +147,12 @@ startup, which leaves idle stop off, and refused on reload.
     `gpudog dash` shows each job's idle time against it in the `IDLE`
     column.
 *   A reload changes both settings for later grants only. Jobs that already
-    hold GPUs keep the limit and threshold they were given.
+    hold GPUs keep the limit and threshold they were given. The log shows
+    the change, for example
+    `configuration reloaded: idle_stop_ms 0 -> 1800000`.
+*   The idle limit is watched by the daemon, so a job that was running when
+    the daemon restarted is no longer stopped for being idle (unlike the
+    hold limit, which `gpudog run` keeps itself).
 *   Without GPU process observation (the test-only `--num-gpus` inventory),
     no job is ever found idle; the daemon warns
     `idle_stop_ms has no effect: GPU processes are not observed, so no job is ever found idle`.

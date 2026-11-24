@@ -54,7 +54,7 @@ release's section.
     and stops the command as at the hold limit.
 *   The daemon's grant line ends with `idle_stop_ms=<ms>` when there is an
     idle limit. Reaching it is logged once:
-    `idle for <ms> ms; asked the client to stop its command, and keeps the reservation until the client closes it`,
+    `idle for <ms> ms; asked the client to stop its command; the reservation is kept until the client closes it`,
     or, when the message cannot be sent, a warning
     `idle for <ms> ms; could not ask the client to stop its command (...); the reservation is kept until the client closes it`.
     With `idle_stop_ms` set and no GPU process observation, the daemon warns

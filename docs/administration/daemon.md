@@ -155,6 +155,14 @@ logged once, as an info line:
 $ journalctl -u gpudogd -g 'still holds its reservation'
 ```
 
+To stop jobs whose GPUs stay idle, such as a hung or forgotten job, set
+[`idle_stop_ms`](configuration.md#idle-stop) as well. Each job that reaches
+it is logged once too:
+
+```shell-session
+$ journalctl -u gpudogd -g 'idle for'
+```
+
 Normally the `released its reservation` line for the same `pid=` follows
 within about 30 seconds. One that does not is still held; find its processes
 as described below.

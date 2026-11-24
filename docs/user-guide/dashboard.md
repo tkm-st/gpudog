@@ -61,7 +61,9 @@ The sections are:
     With an [idle limit](run.md#idle-limit), an `IDLE` column shows how
     long each job's GPUs have been idle without a break, against the limit:
     `4m 10s / 30m 0s`. It shows `0s` while the GPUs are in use or the
-    daemon cannot tell, and `-` for a job granted without a limit. The
+    daemon cannot tell (for example while a container or an MPS server
+    does the job's work); either way the job is not stopped while it shows
+    `0s`. A job granted without a limit shows `-`. The
     column appears only while some job has an idle limit.
 *   **Waiting**: queued requests in queue order, with how many GPUs each wants.
 *   **GPU processes**: every process the daemon sees using a GPU, including
