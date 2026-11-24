@@ -340,21 +340,8 @@ impl HoldLimit {
     pub(crate) fn on_deadline(&mut self, command: Option<Pid>) {
         match std::mem::replace(&mut self.state, State::Done) {
             State::Running { .. } => {
-                let targets = command.map_or_else(Vec::new, command_tree);
-                let grace = grace();
-                note(format!(
-                    "the hold limit of {} has ended; stopping the command (SIGKILL in {})",
-                    describe(self.limit_ms),
-                    describe(u64::try_from(grace.as_millis()).unwrap_or(u64::MAX)),
-                ));
-                signal_command(command, Signal::SIGTERM);
-                signal_all(&targets, Signal::SIGTERM);
-                let now = Instant::now();
-                self.state = State::Stopping {
-                    targets,
-                    kill_at: now + grace,
-                    next_scan: now + SCAN,
-                };
+                let why = format!("the hold limit of {} has ended", describe(self.limit_ms));
+                self.begin_stop(command, &why);
             }
             State::Stopping {
                 mut targets,
@@ -387,6 +374,38 @@ impl HoldLimit {
             }
             State::Done => {}
         }
+    }
+
+    /// Stops the command at once, as when the hold limit ends, because the
+    /// daemon found its GPUs idle for the idle limit of `idle_limit_ms`.
+    /// Does nothing once a stop has begun, so the two limits never stop the
+    /// command twice.
+    pub(crate) fn stop_idle(&mut self, command: Option<Pid>, idle_limit_ms: u64) {
+        if matches!(self.state, State::Running { .. }) {
+            let why = format!(
+                "the GPUs were idle for the idle limit of {}",
+                describe(idle_limit_ms)
+            );
+            self.begin_stop(command, &why);
+        }
+    }
+
+    /// SIGTERM to the command and what it started, then [`State::Stopping`].
+    fn begin_stop(&mut self, command: Option<Pid>, why: &str) {
+        let targets = command.map_or_else(Vec::new, command_tree);
+        let grace = grace();
+        note(format!(
+            "{why}; stopping the command (SIGKILL in {})",
+            describe(u64::try_from(grace.as_millis()).unwrap_or(u64::MAX)),
+        ));
+        signal_command(command, Signal::SIGTERM);
+        signal_all(&targets, Signal::SIGTERM);
+        let now = Instant::now();
+        self.state = State::Stopping {
+            targets,
+            kill_at: now + grace,
+            next_scan: now + SCAN,
+        };
     }
 
     /// After the command itself has exited: if it was being stopped, waits

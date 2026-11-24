@@ -15,6 +15,7 @@ use tokio::signal::unix::{signal, SignalKind};
 
 use crate::common::{complain, connect, note};
 use crate::hold_limit::{self, HoldLimit};
+use crate::idle_stop;
 
 /// Shell conventions for a command that could not be run, and the offset a
 /// shell adds when a process dies from a signal.
@@ -85,6 +86,15 @@ async fn recv(stream: &mut Option<tokio::signal::unix::Signal>) {
     }
 }
 
+/// The daemon's idle stop: `Some` once it arrives, `None` if the
+/// connection ended without one; never, without an idle limit.
+async fn idle_stop_of(idle: &mut Option<tokio::sync::oneshot::Receiver<u64>>) -> Option<u64> {
+    match idle {
+        Some(receiver) => receiver.await.ok(),
+        None => std::future::pending().await,
+    }
+}
+
 /// Sleeps until `deadline`; never, without one.
 async fn until(deadline: Option<tokio::time::Instant>) {
     match deadline {
@@ -150,13 +160,32 @@ pub(crate) async fn run(socket: &Path, command: &[OsString], options: RunOptions
         .map(u32::to_string)
         .collect::<Vec<_>>()
         .join(",");
-    let limit_note = if granted.hold_limit_ms > 0 {
-        format!(
+    let mut limit_note = String::new();
+    if granted.hold_limit_ms > 0 {
+        limit_note.push_str(&format!(
             "; hold limit {}",
             hold_limit::describe(granted.hold_limit_ms)
-        )
+        ));
+    }
+    if granted.idle_limit_ms > 0 {
+        limit_note.push_str(&format!(
+            "; idle limit {}",
+            hold_limit::describe(granted.idle_limit_ms)
+        ));
+    }
+    // Before the command starts, so it cannot miss an idle stop; and only
+    // with an idle limit, since without one the daemon sends nothing.
+    let mut idle = if granted.idle_limit_ms > 0 {
+        match idle_stop::watch(&reservation) {
+            Ok(receiver) => Some(receiver),
+            Err(error) => {
+                return complain(format!(
+                    "cannot watch the reservation for an idle stop: {error}"
+                ))
+            }
+        }
     } else {
-        String::new()
+        None
     };
     note(format!("holding gpu(s) {indices} ({visible}){limit_note}"));
     let mut hold = HoldLimit::new(granted.hold_limit_ms);
@@ -220,6 +249,12 @@ pub(crate) async fn run(socket: &Path, command: &[OsString], options: RunOptions
             biased;
             status = child.wait() => break status,
             () = until(hold.next_deadline()) => hold.on_deadline(pid),
+            stop = idle_stop_of(&mut idle) => {
+                idle = None;
+                if stop.is_some() {
+                    hold.stop_idle(pid, granted.idle_limit_ms);
+                }
+            }
             _ = recv(terminate) => {
                 // Passed on rather than dying first: the child owns the GPUs,
                 // and exiting now would not release them anyway (the child

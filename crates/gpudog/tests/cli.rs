@@ -1068,3 +1068,132 @@ async fn a_command_that_ends_before_its_hold_limit_is_left_alone() {
         )
     );
 }
+
+/// Reports no GPU process at all, so every holder's GPUs look idle.
+struct NoGpuProcesses;
+
+impl gpudog_daemon::gpu_processes::GpuProcessSource for NoGpuProcesses {
+    fn processes(
+        &self,
+        _uuids: &[String],
+    ) -> Result<Vec<gpudog_daemon::gpu_processes::GpuProcess>, gpudog_core::nvml::NvmlError> {
+        Ok(vec![])
+    }
+}
+
+/// A one-GPU daemon that observes no GPU process, reading the host's
+/// `/proc` so that `gpudog run` is found as the holder, with an idle limit
+/// of `idle_stop_ms`. Returns once the first observation has succeeded, so
+/// a request is granted at once.
+async fn start_idle_for(idle_stop_ms: u64) -> Service {
+    let config = ServiceConfig {
+        socket_path: scratch_socket(),
+        require_secure_directory: false,
+        watch_unmanaged_ms: 20,
+        idle_stop_ms,
+        ..ServiceConfig::default()
+    };
+    let service = Service::start_with_observer(
+        Arc::new(StaticInventory::new(vec![
+            gpudog_daemon::gpu_inventory::GpuDevice {
+                index: 0,
+                nvml_index: 0,
+                uuid: support::uuid(0),
+                name: "mock device".into(),
+            },
+        ])),
+        config,
+        discard_log(),
+        Arc::new(NoGpuProcesses),
+        gpudog_daemon::gpu_processes::ProcFs::new("/proc"),
+    )
+    .unwrap();
+    eventually(|| !service.with_scheduler(Scheduler::allocation_paused)).await;
+    service
+}
+
+#[tokio::test]
+async fn the_idle_limit_stops_a_command_that_leaves_its_gpus_idle() {
+    if runner_ignores(Signal::SIGTERM) {
+        return;
+    }
+    let service = start_idle_for(300).await;
+    let started = std::time::Instant::now();
+    let result = output(run_on(&service, &[], &["sleep", "30"])).await;
+    assert!(started.elapsed() < Duration::from_secs(10));
+    assert_eq!(result.code, Some(143), "{}", result.stderr);
+    assert!(
+        result.stderr.starts_with(&format!(
+            "gpudog: holding gpu(s) 0 ({}); idle limit 300ms\n",
+            support::uuid(0)
+        )),
+        "{}",
+        result.stderr
+    );
+    assert!(
+        result.stderr.contains(
+            "gpudog: the GPUs were idle for the idle limit of 300ms; stopping the command (SIGKILL in 30s)\n"
+        ),
+        "{}",
+        result.stderr
+    );
+    eventually(|| service.with_scheduler(Scheduler::free_device_count) == 1).await;
+}
+
+#[tokio::test]
+async fn a_command_that_ends_before_its_idle_limit_exits_and_frees_its_gpus() {
+    let service = start_idle_for(60_000).await;
+    let started = std::time::Instant::now();
+    let result = output(run_on(&service, &[], &["true"])).await;
+    assert!(started.elapsed() < Duration::from_secs(10));
+    assert_eq!(result.code, Some(0), "{}", result.stderr);
+    assert_eq!(
+        result.stderr,
+        format!(
+            "gpudog: holding gpu(s) 0 ({}); idle limit 1m\n",
+            support::uuid(0)
+        )
+    );
+    eventually(|| service.with_scheduler(Scheduler::free_device_count) == 1).await;
+}
+
+#[tokio::test]
+async fn the_hold_and_idle_limits_stop_the_command_only_once() {
+    if runner_ignores(Signal::SIGTERM) {
+        return;
+    }
+    let config = ServiceConfig {
+        socket_path: scratch_socket(),
+        require_secure_directory: false,
+        watch_unmanaged_ms: 20,
+        idle_stop_ms: 300,
+        max_hold_ms: 300,
+        ..ServiceConfig::default()
+    };
+    let service = Service::start_with_observer(
+        Arc::new(StaticInventory::new(vec![
+            gpudog_daemon::gpu_inventory::GpuDevice {
+                index: 0,
+                nvml_index: 0,
+                uuid: support::uuid(0),
+                name: "mock device".into(),
+            },
+        ])),
+        config,
+        discard_log(),
+        Arc::new(NoGpuProcesses),
+        gpudog_daemon::gpu_processes::ProcFs::new("/proc"),
+    )
+    .unwrap();
+    eventually(|| !service.with_scheduler(Scheduler::allocation_paused)).await;
+    let mut command = run_on(&service, &[], &["sleep", "30"]);
+    command.env("GPUDOG_TEST_HOLD_GRACE_MS", "1000");
+    let result = output(command).await;
+    assert_eq!(result.code, Some(143), "{}", result.stderr);
+    assert_eq!(
+        result.stderr.matches("stopping the command").count(),
+        1,
+        "{}",
+        result.stderr
+    );
+}

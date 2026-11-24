@@ -5,6 +5,7 @@ mod common;
 mod dash;
 mod health;
 mod hold_limit;
+mod idle_stop;
 mod run;
 
 use std::process::ExitCode;
