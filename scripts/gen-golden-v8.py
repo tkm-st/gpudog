@@ -101,6 +101,12 @@ malformed += [
     ("status_waiting_idle_limit_over",
      frame(status_full(waiting_idle_limit=MAX_HOLD + 1)), 5),
     ("idle_stop_empty", frame(u16(11)), 1),
+    # status_reply_full cut inside the holder's v8 idle fields, body bytes
+    # 104 to 119: type, device count and table (52 bytes), the holder count
+    # (4), then the holder's id, uid, pid, gpu list, num_gpus, age and hold
+    # limit (48).
+    *((f"status_full_truncated_at_{cut}", frame(status_full()[:cut]), 1)
+      for cut in (104, 106, 110, 112, 114, 118, 119)),
     ("idle_stop_short", frame(u16(11) + u32(0)), 1),
     ("idle_stop_trailing_byte", frame(idle_stop(0) + u8(0)), 4),
 ]

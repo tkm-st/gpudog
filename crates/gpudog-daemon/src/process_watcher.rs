@@ -24,8 +24,8 @@ pub struct ObservedProcess {
     pub row: ProcessRow,
     pub start_time: Option<u64>,
     pub owner: Option<u64>,
-    /// [`GpuProcess::sm_utilization`].
-    pub sm_utilization: Option<u32>,
+    /// [`GpuProcess::utilization`].
+    pub utilization: Option<u32>,
 }
 
 #[derive(Default)]
@@ -138,7 +138,7 @@ impl ProcessTracker {
                     .into_bytes()
             });
             rows.push(ObservedProcess {
-                sm_utilization: process.sm_utilization,
+                utilization: process.utilization,
                 start_time: fact.map(|f| f.identity.start_time),
                 owner: owner.ok().flatten(),
                 row: ProcessRow {

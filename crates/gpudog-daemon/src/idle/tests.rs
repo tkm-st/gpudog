@@ -1,5 +1,5 @@
 use super::*;
-use crate::gpu_processes::ProcessRow;
+use crate::gpu_processes::{Ownership, ProcessRow};
 
 const UID: u32 = 1001;
 const OTHER_UID: u32 = 1002;
@@ -18,7 +18,7 @@ fn row(
     owner: Option<u64>,
     uid: Option<u32>,
     ownership: Ownership,
-    sm_utilization: Option<u32>,
+    utilization: Option<u32>,
 ) -> ObservedProcess {
     ObservedProcess {
         row: ProcessRow {
@@ -31,7 +31,7 @@ fn row(
         },
         start_time: Some(1),
         owner,
-        sm_utilization,
+        utilization,
     }
 }
 
@@ -83,24 +83,27 @@ fn unattributed_work_on_its_gpu_is_unknown() {
 }
 
 #[test]
-fn same_user_work_outside_its_tree_is_unknown() {
+fn work_outside_its_tree_is_unknown_whatever_its_uid() {
     // `gpudog run docker run --gpus ...`: the container's process descends
-    // from containerd, not from `gpudog run`.
-    let rows = [row(1, None, Some(UID), Ownership::NotManaged, Some(90))];
-    assert_eq!(activity(&root(), true, &rows, 0), Activity::Unknown);
-    let unreadable = [row(1, None, None, Ownership::NotManaged, Some(90))];
-    assert_eq!(activity(&root(), true, &unreadable, 0), Activity::Unknown);
-    let elsewhere = [row(1, Some(8), Some(UID), Ownership::WrongGpu, Some(90))];
-    assert_eq!(activity(&root(), true, &elsewhere, 0), Activity::Unknown);
+    // from containerd, not from `gpudog run`, and may run as root or as a
+    // rootless container's subordinate uid; an MPS server may be root's.
+    for uid in [Some(UID), Some(0), Some(OTHER_UID), Some(100_000), None] {
+        let rows = [row(1, None, uid, Ownership::NotManaged, Some(90))];
+        assert_eq!(
+            activity(&root(), true, &rows, 0),
+            Activity::Unknown,
+            "{uid:?}"
+        );
+    }
 }
 
 #[test]
-fn another_users_work_on_its_gpu_does_not_count() {
+fn another_reservations_work_on_its_gpu_does_not_count() {
     let rows = [row(
         0,
-        None,
+        Some(8),
         Some(OTHER_UID),
-        Ownership::NotManaged,
+        Ownership::WrongGpu,
         Some(90),
     )];
     assert_eq!(activity(&root(), true, &rows, 0), Activity::Idle);

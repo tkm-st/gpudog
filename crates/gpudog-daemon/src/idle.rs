@@ -2,14 +2,14 @@
 //! unused, judged from one GPU observation, and how long that has lasted.
 //!
 //! A reservation is idle when none of its processes is on its GPUs, or
-//! when every one of them that is used at most the utilization threshold.
+//! when every one of them that is there used at most the utilization
+//! threshold.
 //! Anything the observation cannot attribute makes the reservation
 //! [`Activity::Unknown`], which never counts as idle: a wrong answer here
 //! stops somebody's job.
 
 use std::time::{Duration, Instant};
 
-use crate::gpu_processes::Ownership;
 use crate::process_watcher::{ObservedProcess, ReservationRoot};
 
 /// What one observation says about one reservation.
@@ -25,8 +25,8 @@ pub enum Activity {
 ///
 /// `resolved` says whether the reservation's own process was found in
 /// procfs; without it, its processes cannot be told apart from anyone
-/// else's. `threshold` is the highest SM utilization, in percent, that
-/// still counts as idle.
+/// else's. `threshold` is the highest utilization, in percent, that still
+/// counts as idle.
 pub fn activity(
     root: &ReservationRoot,
     resolved: bool,
@@ -52,23 +52,18 @@ pub fn activity(
             own.push(process);
             continue;
         }
-        match process.row.ownership {
-            // Unattributed work on this reservation's GPU may be its own.
-            Ownership::Unknown => return Activity::Unknown,
-            // Work of the same user (or of an unreadable one) that did not
-            // descend from the reservation: `docker run --gpus`, a
-            // double-forked worker or an MPS server, all doing the job's
-            // work. Another user's process is not this job's.
-            Ownership::Managed | Ownership::WrongGpu | Ownership::NotManaged => {
-                if process.row.uid.is_none_or(|uid| uid == root.uid) {
-                    return Activity::Unknown;
-                }
-            }
+        // Only work known to belong to another reservation is not this
+        // one's. Anything else on its GPU may be doing its work without
+        // descending from it, whatever its uid: `docker run --gpus` (root,
+        // or a rootless container's subordinate uid), a double-forked
+        // worker, or an MPS server run by root or a service account.
+        if process.owner.is_none() {
+            return Activity::Unknown;
         }
     }
     let busy = own.iter().any(|process| {
         process
-            .sm_utilization
+            .utilization
             .is_none_or(|percent| percent > threshold)
     });
     if own.is_empty() || !busy {

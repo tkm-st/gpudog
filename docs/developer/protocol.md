@@ -86,7 +86,9 @@ keeps the reservation until the connection closes; a holder that ignores the
 message keeps its GPUs. After the grant this is the only message the daemon
 sends unasked, apart from `pong`, so a client that holds a reservation and
 does not read its connection only leaves `idle_stop` unread in the socket
-buffer.
+buffer. `gpudog run` reads the connection it shares with its command, so a
+command that pings the daemon on the inherited descriptor may lose the
+`pong` to it.
 
 ### `status_reply`
 

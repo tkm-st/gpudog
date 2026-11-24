@@ -25,7 +25,8 @@
 # `gpudog run` stops it the same way; 0 means never, otherwise at least
 # 60000. A job is idle while it has no process on its GPUs, or while every
 # one of its GPU processes stays at or below idle_utilization_percent (0-99)
-# SM utilization. A reload applies only to later grants.
+# utilization (the busiest of compute, memory, encoder and decoder). A
+# reload applies only to later grants.
 # idle_stop_ms = 0
 # idle_utilization_percent = 0
 

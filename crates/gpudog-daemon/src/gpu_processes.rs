@@ -31,9 +31,10 @@ pub struct GpuProcess {
     pub pid: u32,
     /// Bytes, when the driver reports it.
     pub used_memory: Option<u64>,
-    /// Highest SM utilization, in percent, NVML sampled for this process
+    /// Highest utilization, in percent, of SM, memory, encoder or decoder,
+    /// NVML sampled for this process
     /// since the previous query; `None` when the GPU does not report it.
-    pub sm_utilization: Option<u32>,
+    pub utilization: Option<u32>,
 }
 
 /// Where the daemon's process list comes from: NVML in production, a fixed
@@ -53,7 +54,8 @@ pub struct NvmlProcessSource {
     last_sample: Mutex<HashMap<String, u64>>,
 }
 
-/// Highest SM utilization per pid in one utilization query, or `None` when
+/// Highest utilization per pid in one utilization query (the busiest of
+/// SM, memory, encoder and decoder in any sample), or `None` when
 /// the GPU does not report it. `newest` is the timestamp to ask from next.
 #[derive(Debug, Default, PartialEq, Eq)]
 struct Utilization {
@@ -72,7 +74,14 @@ fn utilization(result: Result<Vec<ProcessUtilizationSample>, RawNvmlError>) -> U
             let mut peaks = HashMap::new();
             for sample in &samples {
                 let peak = peaks.entry(sample.pid).or_insert(0);
-                *peak = sample.sm_util.min(100).max(*peak);
+                // Compute, memory, encoder or decoder: a job busy with any
+                // of them is not idle.
+                let busiest = sample
+                    .sm_util
+                    .max(sample.mem_util)
+                    .max(sample.enc_util)
+                    .max(sample.dec_util);
+                *peak = busiest.min(100).max(*peak);
             }
             Utilization {
                 peaks: Some(peaks),
@@ -196,7 +205,7 @@ impl NvmlProcessSource {
                         gpu_uuid: uuid.clone(),
                         pid: info.pid,
                         used_memory: used,
-                        sm_utilization: percent(info.pid),
+                        utilization: percent(info.pid),
                     }),
                 }
             }

@@ -98,7 +98,7 @@ async fn gpu_processes_without_readable_owners_are_reported_once() {
         gpu_uuid: "GPU-static-0".into(),
         pid: 99,
         used_memory: Some(42),
-        sm_utilization: None,
+        utilization: None,
     };
     let (sink, events) = recording_log();
     let (service, source) = observed_service_logging(Ok(vec![process.clone()]), sink);
@@ -129,7 +129,7 @@ async fn external_process_is_shown_and_waited_for_even_without_proc_metadata() {
         gpu_uuid: "GPU-static-0".into(),
         pid: 99,
         used_memory: Some(42),
-        sm_utilization: None,
+        utilization: None,
     };
     let (service, source) = observed_service(Ok(vec![process]));
     eventually(|| service.snapshot().observation_age_ms.is_some()).await;
@@ -2175,13 +2175,13 @@ fn idle_service(
 }
 
 /// A process of this test on daemon slot 0.
-fn on_gpu_zero(pid: u32, sm_utilization: Option<u32>) -> crate::gpu_processes::GpuProcess {
+fn on_gpu_zero(pid: u32, utilization: Option<u32>) -> crate::gpu_processes::GpuProcess {
     crate::gpu_processes::GpuProcess {
         nvml_index: 0,
         gpu_uuid: "GPU-static-0".into(),
         pid,
         used_memory: Some(42),
-        sm_utilization,
+        utilization,
     }
 }
 
@@ -2339,5 +2339,24 @@ async fn a_holder_that_uses_its_gpus_is_never_asked_to_stop() {
             .await
             .is_err()
     );
+    assert!(service.with_scheduler(|s| s.holds(1)));
+}
+
+#[tokio::test]
+async fn a_holder_on_a_retiring_gpu_is_never_found_idle() {
+    let (service, _source, _) = idle_service(400, Ok(vec![]));
+    let mut holder = hold_gpu_zero(&service).await;
+    // Removed while held: no longer observed, so its work there is not seen.
+    let config = service.config();
+    service
+        .reconfigure(&config, Some(&["GPU-static-1".to_owned()]))
+        .unwrap();
+    within_seconds(5, || idle_ms(&service) == 0).await;
+    assert!(
+        tokio::time::timeout(Duration::from_millis(1000), holder.recv())
+            .await
+            .is_err()
+    );
+    assert_eq!(idle_ms(&service), 0);
     assert!(service.with_scheduler(|s| s.holds(1)));
 }

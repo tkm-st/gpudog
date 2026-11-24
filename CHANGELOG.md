@@ -44,7 +44,7 @@ release's section.
     `<held> / <limit>`.
 *   `idle_stop_ms` and `idle_utilization_percent` in `config.toml`: how long
     a request's GPUs may stay idle, counted from the grant, and the highest
-    SM utilization that still counts as idle. `idle_stop_ms` defaults to
+    GPU utilization that still counts as idle. `idle_stop_ms` defaults to
     `0`, never, and is otherwise at least `60000`; the threshold defaults to
     `0` and is at most `99`. A reload applies them to later grants only.
 *   With an idle limit, `gpudog run` ends its `holding gpu(s)` line with

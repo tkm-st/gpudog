@@ -179,8 +179,8 @@ line ends with it, for example `; idle limit 30m`, and `gpudog dash` shows
 how long each job's GPUs have been idle in its `IDLE` column.
 
 Your GPUs count as idle while none of your command's processes runs on
-them, or while those that do run do (almost) no compute work; the
-administrator sets how little. The idle time counts from the grant, so a
+them, or while those that do run do (almost) no work on them (compute,
+memory, video encoding or decoding); the administrator sets how little. The idle time counts from the grant, so a
 job that spends a long time loading data before it touches a GPU can reach
 the limit before it starts. It starts again whenever your job uses its GPUs.
 On more than one GPU, the job is idle only while all of them are.
@@ -196,8 +196,13 @@ gpudog: the GPUs were idle for the idle limit of 30m; stopping the command (SIGK
 *   The `SIGTERM`, the 30 seconds before `SIGKILL`, the processes stopped
     and the exit status are as at the hold limit. Only this line tells an
     idle stop apart.
-*   Jobs whose GPU work does not start from your command, such as
-    `gpudog run docker run --gpus ...`, are never stopped for being idle.
+*   While a process that did not start from your command runs on your
+    GPUs, such as the work of `gpudog run docker run --gpus ...` or a CUDA
+    MPS server, your job is never stopped for being idle.
+*   `gpudog run` learns of the stop on the reservation's connection, which
+    your command inherits. A command that reads that connection itself may
+    take the message, and then is not stopped; `gpudog` prints
+    `unexpected data on the reservation's connection` when it notices.
 *   If the daemon restarts while your command runs, the idle limit no
     longer applies to it.
 

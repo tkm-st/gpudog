@@ -37,7 +37,7 @@ fn gpu(pid: u32, index: u32) -> GpuProcess {
         nvml_index: index,
         gpu_uuid: format!("GPU-static-{index}"),
         used_memory: Some(42),
-        sm_utilization: None,
+        utilization: None,
     }
 }
 

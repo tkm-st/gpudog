@@ -54,8 +54,8 @@ pub const DEFAULT_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
 pub const DEFAULT_WATCH_UNMANAGED_MS: u64 = 1000;
 pub const MAX_WATCH_UNMANAGED_MS: u64 = 3_600_000;
 /// Shortest `idle_stop_ms` other than 0 (off). Shorter would stop jobs
-/// still starting up, and an idle stop that arrives before `gpudog run`
-/// hands its connection to the command could be missed.
+/// still starting up, and an idle stop must not arrive before `gpudog run`
+/// has handed its connection over, which it refuses to do with data unread.
 pub const MIN_IDLE_STOP_MS: u64 = 60_000;
 /// Highest `idle_utilization_percent`. At 100 every job would count as
 /// idle, which would make the setting a second hold limit.
@@ -191,8 +191,8 @@ pub struct ServiceConfig {
     /// Milliseconds a grant may stay idle before the daemon asks its client
     /// to stop the command; 0 means never. Sent to the client in `Granted`.
     pub idle_stop_ms: u64,
-    /// Highest SM utilization, in percent, at which a job's GPU processes
-    /// still count as idle.
+    /// Highest utilization, in percent, at which a job's GPU processes still
+    /// count as idle.
     pub idle_utilization_percent: u32,
 }
 
@@ -534,7 +534,16 @@ impl State {
             let Some(clock) = session.idle.as_mut() else {
                 continue;
             };
-            let activity = idle::activity(root, resolved, &self.observation.rows, threshold);
+            // A retiring GPU is not observed, so work on it is not seen.
+            let observed = root
+                .gpus
+                .iter()
+                .all(|&slot| self.scheduler.slot_state(Slot(slot)) == Some(SlotState::Managed));
+            let activity = if observed {
+                idle::activity(root, resolved, &self.observation.rows, threshold)
+            } else {
+                idle::Activity::Unknown
+            };
             if let Some(idle) = clock.observe(activity, now) {
                 session.idle_stop_ms = Some(millis(idle));
                 session.idle_reached.notify_one();

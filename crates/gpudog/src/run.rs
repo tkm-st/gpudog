@@ -272,7 +272,8 @@ pub(crate) async fn run(socket: &Path, command: &[OsString], options: RunOptions
     // A command stopped at its hold limit may leave processes it started;
     // wait for them, or kill them when the grace period ends.
     hold.finish().await;
-    // The reservation ends once the child has exited too.
+    // The reservation ends once the child has exited too, and, with an idle
+    // limit, once the process exits: the idle-stop reader holds a duplicate.
     drop(reservation);
 
     match status {

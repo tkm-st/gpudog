@@ -418,9 +418,16 @@ fn utilization_keeps_each_processes_peak_and_the_newest_sample() {
         sample(10, 9, 70),
         sample(11, 7, 400),
         sample(10, 8, 20),
+        ProcessUtilizationSample {
+            dec_util: 85,
+            ..sample(12, 4, 0)
+        },
     ]));
     assert_eq!(usage.newest, Some(9));
-    assert_eq!(usage.peaks, Some(HashMap::from([(10, 70), (11, 100)])));
+    assert_eq!(
+        usage.peaks,
+        Some(HashMap::from([(10, 70), (11, 100), (12, 85)]))
+    );
 }
 
 #[test]
