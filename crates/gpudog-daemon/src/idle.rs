@@ -77,8 +77,9 @@ pub fn activity(
 ///
 /// Starts at the grant, as if idle, so a job that never touches its GPUs
 /// is stopped `limit` after it was granted. Any observation that is not
-/// [`Activity::Idle`], and any failed or discarded observation, restarts
-/// it.
+/// [`Activity::Idle`], any failed or discarded observation, and one that
+/// comes too long after the previous one ([`observation_gap_too_long`]),
+/// restarts it.
 #[derive(Debug, Clone)]
 pub struct IdleClock {
     limit: Duration,
@@ -127,7 +128,8 @@ impl IdleClock {
 
 /// Whether two successful observations, `gap` apart with observations due
 /// every `period`, left too long unseen to count it as idle. Allows for a
-/// few late or failed-and-retried queries.
+/// few late queries. A reload that shortens `period` can make the first
+/// gap after it look too long, which only delays an idle stop.
 pub fn observation_gap_too_long(gap: Duration, period: Duration) -> bool {
     gap > period.saturating_mul(3) + Duration::from_secs(5)
 }

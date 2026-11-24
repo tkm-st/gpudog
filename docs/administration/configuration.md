@@ -132,6 +132,12 @@ startup, which leaves idle stop off, and refused on reload.
     server. Such jobs are not stopped for being idle while that process
     runs. Only a process of another reservation on the job's GPU is left
     out.
+*   A GPU observation that comes much later than `watch_unmanaged_ms`
+    (more than three intervals plus 5 seconds after the previous successful
+    one) restarts every idle time, since the daemon cannot tell what
+    happened meanwhile. So does the first observation after a reload that
+    shortens `watch_unmanaged_ms`. Either way a job is stopped later than
+    its limit, never earlier.
 *   A GPU that does not report per-process utilization counts a job as idle
     only when none of its processes runs there.
 *   Do not set `idle_stop_ms` where NVML does not list the processes using
@@ -140,10 +146,6 @@ startup, which leaves idle stop off, and refused on reload.
     idle there and be stopped.
 *   A job holding a GPU that a reload removed from `devices` is not
     observed on it, so it is never found idle while it holds that GPU.
-*   A GPU observation that takes much longer than `watch_unmanaged_ms`
-    (more than three intervals plus 5 seconds since the previous one)
-    restarts every idle time, since the daemon cannot tell what happened
-    meanwhile.
 *   The daemon reads utilization at each observation (`watch_unmanaged_ms`).
     NVML keeps only a short history of samples, so with a long interval a
     burst of work between two observations may be missed.

@@ -152,7 +152,8 @@ deploy the EOL Debian 10 build/test stages.
     outside that mutex. Usage blocks allocation regardless of process labels.
     Never clear pause/busy state on query failure or revoke running reservations.
     Idle detection (`idle`) counts nothing it cannot attribute as idle, and
-    a failed or dropped observation restarts every idle time; a failed
+    a failed or dropped observation, or one that comes too long after the
+    previous success, restarts every idle time; a failed
     `IdleStop` write never ends the hold.
     Static `--num-gpus` inventories bypass observation for wire tests only.
 *   NVML and descriptors use RAII/Drop. Workspace `unsafe_code` is denied.
