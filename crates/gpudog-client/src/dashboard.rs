@@ -145,6 +145,20 @@ fn reservation_rows(list: &[ReservationInfo], queued: bool) -> Vec<Vec<String>> 
         .collect()
 }
 
+/// How long a holder's GPUs have been idle, against its idle limit:
+/// `4m 10s / 30m 0s`; `-` for a holder without one.
+fn idle_cell(info: &ReservationInfo) -> String {
+    if info.idle_limit_ms == 0 {
+        "-".to_owned()
+    } else {
+        format!(
+            "{} / {}",
+            human_age(info.idle_ms),
+            human_age(info.idle_limit_ms)
+        )
+    }
+}
+
 fn process_rows(rows: &[GpuProcessInfo]) -> Vec<Vec<String>> {
     let unknown = || "?".to_owned();
     rows.iter()
@@ -222,12 +236,30 @@ pub fn render(status: &StatusReply, processes: &ProcessView, refresh_seconds: u6
     }
 
     out.push_str("\nIn use\n");
-    table(
-        &mut out,
-        &["GPUS", "UID", "PID", "HELD", "COMMAND"],
-        &reservation_rows(&status.holders, false),
-        "no GPUs in use",
-    );
+    // An `IDLE` column only when the daemon stops idle jobs.
+    if status.holders.iter().any(|h| h.idle_limit_ms > 0) {
+        let rows: Vec<Vec<String>> = reservation_rows(&status.holders, false)
+            .into_iter()
+            .zip(&status.holders)
+            .map(|(mut row, info)| {
+                row.insert(4, idle_cell(info));
+                row
+            })
+            .collect();
+        table(
+            &mut out,
+            &["GPUS", "UID", "PID", "HELD", "IDLE", "COMMAND"],
+            &rows,
+            "no GPUs in use",
+        );
+    } else {
+        table(
+            &mut out,
+            &["GPUS", "UID", "PID", "HELD", "COMMAND"],
+            &reservation_rows(&status.holders, false),
+            "no GPUs in use",
+        );
+    }
 
     out.push_str("\nWaiting\n");
     table(
@@ -489,6 +521,36 @@ mod tests {
         assert_eq!(rows.len(), 2);
         assert!(!rows[0].contains(" / "), "{:?}", rows[0]);
         assert!(rows[1].contains("2m 5s / 2h 0m"), "{:?}", rows[1]);
+    }
+
+    #[test]
+    fn idle_time_is_shown_only_when_a_holder_has_an_idle_limit() {
+        let plain = StatusReply {
+            device_count: 4,
+            holders: vec![holder(&[0])],
+            ..StatusReply::default()
+        };
+        assert!(!render(&plain, &no_processes(), 5).contains("IDLE"));
+
+        let watched = ReservationInfo {
+            idle_limit_ms: 1_800_000,
+            idle_ms: 250_000,
+            ..holder(&[1])
+        };
+        let status = StatusReply {
+            device_count: 4,
+            holders: vec![holder(&[0]), watched],
+            ..StatusReply::default()
+        };
+        let text = render(&status, &no_processes(), 5);
+        assert!(text.contains("IDLE"), "{text}");
+        let rows: Vec<&str> = text
+            .lines()
+            .filter(|l| l.contains("python train.py"))
+            .collect();
+        assert_eq!(rows.len(), 2);
+        assert!(rows[0].contains(" - "), "{:?}", rows[0]);
+        assert!(rows[1].contains("4m 10s / 30m 0s"), "{:?}", rows[1]);
     }
 
     #[test]
