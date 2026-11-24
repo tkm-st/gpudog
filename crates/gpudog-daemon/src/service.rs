@@ -34,6 +34,7 @@ use tokio_util::codec::Framed;
 
 use crate::gpu_inventory::{GpuDevice, GpuInventory};
 use crate::gpu_processes::{GpuProcessSource, ManagedNvmlSource, ProcFs, ProcessIdentity, Seeds};
+use crate::idle::{self, IdleClock};
 use crate::peer_credentials::{credentials_of, PeerCredentials};
 use crate::process_watcher::{ObservedProcess, ProcessTracker, ReservationRoot};
 use crate::scheduler::{
@@ -64,6 +65,10 @@ pub const MAX_IDLE_UTILIZATION_PERCENT: u32 = 99;
 /// consecutive failures to swallow between log lines.
 const ACCEPT_BACKOFF: Duration = Duration::from_millis(100);
 const ACCEPT_FAILURE_LOG_INTERVAL: u64 = 100;
+
+/// Logged when `idle_stop_ms` is set but nothing observes GPU processes.
+const IDLE_STOP_UNOBSERVED: &str =
+    "idle_stop_ms has no effect: GPU processes are not observed, so no job is ever found idle";
 
 /// How often a too-large process tree is reported again.
 const TRUNCATION_LOG_INTERVAL: Duration = Duration::from_secs(3600);
@@ -246,6 +251,16 @@ struct SessionInfo {
     /// `Granted::idle_limit_ms` this session was given; 0 until granted,
     /// and 0 for never.
     idle_limit_ms: u64,
+    /// How long its GPUs have been idle; `None` without an idle limit.
+    idle: Option<IdleClock>,
+    /// `idle_utilization_percent` at the grant.
+    idle_threshold: u32,
+    /// The idle time, once the idle limit is reached. [`hold`] sends it in
+    /// `IdleStop` when `idle_reached` wakes it.
+    idle_stop_ms: Option<u64>,
+    /// Notified once, with a stored permit, so a limit reached before
+    /// [`hold`] starts waiting is not lost.
+    idle_reached: Arc<Notify>,
 }
 
 #[derive(Default)]
@@ -497,9 +512,41 @@ impl State {
         if let Some(session) = self.sessions.get_mut(&id) {
             session.hold_limit_ms = hold_limit_ms;
             session.idle_limit_ms = idle_limit_ms;
+            session.idle_threshold = self.config.idle_utilization_percent;
+            session.idle = (idle_limit_ms > 0)
+                .then(|| IdleClock::new(Duration::from_millis(idle_limit_ms), now));
             // Bounded by `MAX_HOLD_LIMIT_MS`, so this cannot overflow.
             session.hold_deadline =
                 (hold_limit_ms > 0).then(|| now + Duration::from_millis(hold_limit_ms));
+        }
+    }
+
+    /// Advances the idle clock of every holder in `roots`, the holders an
+    /// observation that just succeeded looked for, from its rows. Wakes the
+    /// session of each holder whose idle limit is reached.
+    fn observe_idle(&mut self, roots: &[ReservationRoot], now: Instant) {
+        for root in roots {
+            let resolved = self.observation.tracker.resolved(root);
+            let Some(session) = self.sessions.get_mut(&root.id) else {
+                continue;
+            };
+            let threshold = session.idle_threshold;
+            let Some(clock) = session.idle.as_mut() else {
+                continue;
+            };
+            let activity = idle::activity(root, resolved, &self.observation.rows, threshold);
+            if let Some(idle) = clock.observe(activity, now) {
+                session.idle_stop_ms = Some(millis(idle));
+                session.idle_reached.notify_one();
+            }
+        }
+    }
+
+    /// An observation failed or was dropped: no holder is known to be
+    /// idle, so every idle time starts again.
+    fn reset_idle(&mut self) {
+        for clock in self.sessions.values_mut().filter_map(|s| s.idle.as_mut()) {
+            clock.reset();
         }
     }
 
@@ -672,6 +719,10 @@ fn to_message(reply: Reply) -> Message {
         Reply::Queued { position } => Queued { position }.into(),
         Reply::Denied { reason, detail } => denied(reason, detail).into(),
     }
+}
+
+fn millis(duration: Duration) -> u64 {
+    u64::try_from(duration.as_millis()).unwrap_or(u64::MAX)
 }
 
 fn join(gpus: &[u32]) -> String {
@@ -931,6 +982,7 @@ impl Service {
                 errno_text(&e)
             ))
         })?;
+        let config_idle_stop_ms = config.idle_stop_ms;
         let mut service = Self {
             shared: Arc::new(Shared {
                 state: Mutex::new(State {
@@ -977,6 +1029,9 @@ impl Service {
             LogLevel::Access,
             &format!("listening on {} with {device_count} GPU(s)", path.display()),
         );
+        if !observing && config_idle_stop_ms > 0 {
+            service.shared.log(LogLevel::Warning, IDLE_STOP_UNOBSERVED);
+        }
         // An unreadable procfs is reported by the observation itself.
         if observing && service.shared.procfs.readable() && !service.shared.procfs.lists_children()
         {
@@ -1110,6 +1165,9 @@ impl Service {
             state.pump(Instant::now());
             changes
         };
+        if config.idle_stop_ms > 0 && !self.shared.lock().observation.enabled {
+            self.shared.log(LogLevel::Warning, IDLE_STOP_UNOBSERVED);
+        }
         self.shared.rearm.notify_one();
         // A shorter period must not leave the task asleep on the old one
         // while freshness is judged by the new one, and a newly managed GPU
@@ -1178,6 +1236,7 @@ async fn observation_loop(shared: Arc<Shared>, source: Arc<dyn GpuProcessSource>
                 state.observation.generation,
             )
         };
+        let observed_roots = roots.clone();
         let provider = source.clone();
         let procfs = shared.procfs.clone();
         let result = tokio::task::spawn_blocking(move || {
@@ -1228,6 +1287,7 @@ async fn observation_loop(shared: Arc<Shared>, source: Arc<dyn GpuProcessSource>
                 // stays paused, as it has been since this query started,
                 // until a query of the current devices succeeds.
                 again = true;
+                state.reset_idle();
                 report = Some((
                     LogLevel::Access,
                     "the managed GPUs changed during a GPU observation; observing again".to_owned(),
@@ -1270,6 +1330,7 @@ async fn observation_loop(shared: Arc<Shared>, source: Arc<dyn GpuProcessSource>
                             );
                         }
                         state.observation.rows = rows;
+                        state.observe_idle(&observed_roots, now);
                         state.observation.busy = busy.clone();
                         state.scheduler.set_busy_owners(&owners);
                         state.resume_observed_usage(&busy);
@@ -1297,6 +1358,7 @@ async fn observation_loop(shared: Arc<Shared>, source: Arc<dyn GpuProcessSource>
                             ));
                         }
                         state.observation.error = error;
+                        state.reset_idle();
                         let busy = state.observation.busy.clone();
                         state.scheduler.set_observed_usage(true, &busy);
                     }
@@ -1809,6 +1871,10 @@ async fn handle_acquire(
                 hold_limit_ms: 0,
                 hold_deadline: None,
                 idle_limit_ms: 0,
+                idle: None,
+                idle_threshold: 0,
+                idle_stop_ms: None,
+                idle_reached: Arc::new(Notify::new()),
             },
         );
         state.submit(&submission, now)
@@ -2021,7 +2087,9 @@ fn snapshot(shared: &Shared) -> StatusReply {
                     .unwrap_or(u64::MAX),
                 hold_limit_ms: session.map_or(0, |s| s.hold_limit_ms),
                 idle_limit_ms: session.map_or(0, |s| s.idle_limit_ms),
-                idle_ms: 0,
+                idle_ms: session
+                    .and_then(|s| s.idle.as_ref())
+                    .map_or(0, |clock| millis(clock.idle(now))),
                 position: entry.position,
                 command: command.into_bytes(),
             };

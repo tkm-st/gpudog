@@ -2150,3 +2150,146 @@ async fn a_holder_that_leaves_before_its_limit_is_not_reported_overdue() {
         .iter()
         .any(|(_, line)| line.contains("after its hold limit")));
 }
+
+/// An observed two-GPU daemon with an idle limit of `idle_stop_ms`, reading
+/// the host's own `/proc`, so this test process, the client, is found as
+/// the reservation's root.
+fn idle_service(
+    idle_stop_ms: u64,
+    initial: Result<Vec<crate::gpu_processes::GpuProcess>, gpudog_core::nvml::NvmlError>,
+) -> (Service, ObservedState, Events) {
+    let observed = Arc::new(Mutex::new(initial));
+    let (sink, events) = recording_log();
+    let mut config = test_config(scratch_socket());
+    config.watch_unmanaged_ms = 20;
+    config.idle_stop_ms = idle_stop_ms;
+    let service = Service::start_with_observer(
+        Arc::new(StaticInventory::with_count(2)),
+        config,
+        sink,
+        Arc::new(ControlledSource(observed.clone())),
+        ProcFs::new("/proc"),
+    )
+    .unwrap();
+    (service, observed, events)
+}
+
+/// A process of this test on daemon slot 0.
+fn on_gpu_zero(pid: u32, sm_utilization: Option<u32>) -> crate::gpu_processes::GpuProcess {
+    crate::gpu_processes::GpuProcess {
+        nvml_index: 0,
+        gpu_uuid: "GPU-static-0".into(),
+        pid,
+        used_memory: Some(42),
+        sm_utilization,
+    }
+}
+
+/// Holds GPU 0 of `service` once its first observation succeeded.
+async fn hold_gpu_zero(service: &Service) -> Client {
+    eventually(|| !service.with_scheduler(Scheduler::allocation_paused)).await;
+    let mut holder = Client::ready(service).await;
+    let first = holder.acquire(by_uuid(&["GPU-static-0"])).await;
+    if is_queued(&first) {
+        let next = tokio::time::timeout(Duration::from_secs(5), holder.recv())
+            .await
+            .expect("GPU 0 was never granted");
+        assert!(is_granted(&next));
+    } else {
+        assert!(is_granted(&first));
+    }
+    holder
+}
+
+fn idle_ms(service: &Service) -> u64 {
+    service.snapshot().holders[0].idle_ms
+}
+
+/// Waits (bounded, longer than [`eventually`]) for `condition`.
+async fn within_seconds(seconds: u64, mut condition: impl FnMut() -> bool) {
+    let deadline = Instant::now() + Duration::from_secs(seconds);
+    while !condition() {
+        assert!(Instant::now() < deadline, "condition never became true");
+        pause(10).await;
+    }
+}
+
+#[tokio::test]
+async fn unused_gpus_count_as_idle_from_the_grant() {
+    let (service, _source, _) = idle_service(3_600_000, Ok(vec![]));
+    let _holder = hold_gpu_zero(&service).await;
+    assert_eq!(service.snapshot().holders[0].idle_limit_ms, 3_600_000);
+    within_seconds(5, || idle_ms(&service) >= 100).await;
+}
+
+#[tokio::test]
+async fn no_idle_time_is_shown_without_an_idle_limit() {
+    let (service, _source, _) = idle_service(0, Ok(vec![]));
+    let _holder = hold_gpu_zero(&service).await;
+    pause(100).await;
+    let holder = &service.snapshot().holders[0];
+    assert_eq!((holder.idle_limit_ms, holder.idle_ms), (0, 0));
+}
+
+#[tokio::test]
+async fn a_busy_process_of_the_job_keeps_it_active() {
+    let me = std::process::id();
+    let (service, source, _) = idle_service(3_600_000, Ok(vec![]));
+    let _holder = hold_gpu_zero(&service).await;
+    // Set after the grant: observed usage blocks a grant on GPU 0.
+    *source.lock().unwrap() = Ok(vec![on_gpu_zero(me, None)]);
+    within_seconds(5, || idle_ms(&service) == 0).await;
+    pause(100).await;
+    assert_eq!(idle_ms(&service), 0);
+    // At 0% it is idle after all.
+    *source.lock().unwrap() = Ok(vec![on_gpu_zero(me, Some(0))]);
+    within_seconds(5, || idle_ms(&service) >= 100).await;
+    *source.lock().unwrap() = Ok(vec![on_gpu_zero(me, Some(1))]);
+    within_seconds(5, || idle_ms(&service) == 0).await;
+}
+
+#[tokio::test]
+async fn unattributed_work_on_its_gpu_keeps_it_from_counting_as_idle() {
+    let (service, source, _) = idle_service(3_600_000, Ok(vec![]));
+    let _holder = hold_gpu_zero(&service).await;
+    // No such process in /proc: its owner cannot be known.
+    *source.lock().unwrap() = Ok(vec![on_gpu_zero(0x7fff_fff0, Some(0))]);
+    within_seconds(5, || idle_ms(&service) == 0).await;
+    pause(100).await;
+    assert_eq!(idle_ms(&service), 0);
+}
+
+#[tokio::test]
+async fn a_failed_observation_restarts_the_idle_time() {
+    let (service, source, _) = idle_service(3_600_000, Ok(vec![]));
+    let _holder = hold_gpu_zero(&service).await;
+    within_seconds(5, || idle_ms(&service) >= 100).await;
+    *source.lock().unwrap() = Err(gpudog_core::nvml::NvmlError("mock observer failure".into()));
+    within_seconds(5, || idle_ms(&service) == 0).await;
+    *source.lock().unwrap() = Ok(vec![]);
+    within_seconds(5, || idle_ms(&service) >= 100).await;
+}
+
+#[tokio::test]
+async fn an_idle_limit_without_observation_is_warned_about() {
+    let (sink, events) = recording_log();
+    let mut config = test_config(scratch_socket());
+    config.idle_stop_ms = 60_000;
+    let service = Service::start(
+        Arc::new(StaticInventory::with_count(1)),
+        None,
+        config.clone(),
+        sink,
+    )
+    .unwrap();
+    service.reconfigure(&config, None).unwrap();
+    let warnings = events
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(level, message)| {
+            *level == LogLevel::Warning && message.starts_with("idle_stop_ms has no effect")
+        })
+        .count();
+    assert_eq!(warnings, 2);
+}
