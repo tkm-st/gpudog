@@ -21,6 +21,14 @@
 # SIGKILL 30 seconds later). A reload applies only to later grants.
 # max_hold_ms = 0
 
+# Milliseconds a job may leave its GPUs idle, counted from the grant, before
+# `gpudog run` stops it the same way; 0 means never, otherwise at least
+# 60000. A job is idle while it has no process on its GPUs, or while every
+# one of its GPU processes stays at or below idle_utilization_percent (0-99)
+# SM utilization. A reload applies only to later grants.
+# idle_stop_ms = 0
+# idle_utilization_percent = 0
+
 # Client connections at once, in total and from one user.
 # max_connections = 256
 # max_connections_per_uid = 16

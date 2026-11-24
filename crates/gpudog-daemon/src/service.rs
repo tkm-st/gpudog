@@ -52,6 +52,13 @@ pub const DEFAULT_MAX_CONNECTIONS_PER_UID: usize = 16;
 pub const DEFAULT_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
 pub const DEFAULT_WATCH_UNMANAGED_MS: u64 = 1000;
 pub const MAX_WATCH_UNMANAGED_MS: u64 = 3_600_000;
+/// Shortest `idle_stop_ms` other than 0 (off). Shorter would stop jobs
+/// still starting up, and an idle stop that arrives before `gpudog run`
+/// hands its connection to the command could be missed.
+pub const MIN_IDLE_STOP_MS: u64 = 60_000;
+/// Highest `idle_utilization_percent`. At 100 every job would count as
+/// idle, which would make the setting a second hold limit.
+pub const MAX_IDLE_UTILIZATION_PERCENT: u32 = 99;
 
 /// How long to wait before retrying a failed accept, and how many
 /// consecutive failures to swallow between log lines.
@@ -176,6 +183,12 @@ pub struct ServiceConfig {
     /// 0 means no limit. The client stops its command when it ends. The
     /// daemon only logs a reservation held longer: it never revokes one.
     pub max_hold_ms: u64,
+    /// Milliseconds a grant may stay idle before the daemon asks its client
+    /// to stop the command; 0 means never. Sent to the client in `Granted`.
+    pub idle_stop_ms: u64,
+    /// Highest SM utilization, in percent, at which a job's GPU processes
+    /// still count as idle.
+    pub idle_utilization_percent: u32,
 }
 
 impl Default for ServiceConfig {
@@ -190,6 +203,8 @@ impl Default for ServiceConfig {
             scheduler_limits: SchedulerLimits::default(),
             watch_unmanaged_ms: DEFAULT_WATCH_UNMANAGED_MS,
             max_hold_ms: 0,
+            idle_stop_ms: 0,
+            idle_utilization_percent: 0,
         }
     }
 }
@@ -1075,6 +1090,8 @@ impl Service {
             live.watch_unmanaged_ms = config.watch_unmanaged_ms;
             // Read at each grant, so reservations already held keep theirs.
             live.max_hold_ms = config.max_hold_ms;
+            live.idle_stop_ms = config.idle_stop_ms;
+            live.idle_utilization_percent = config.idle_utilization_percent;
             state.observation.period = Duration::from_millis(config.watch_unmanaged_ms);
             state.scheduler.set_limits(config.scheduler_limits);
             state.pump(Instant::now());

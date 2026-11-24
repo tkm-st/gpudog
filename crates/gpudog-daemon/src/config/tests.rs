@@ -54,6 +54,47 @@ fn the_hold_limit_defaults_to_none_and_is_bounded_by_the_wire() {
     );
 }
 
+#[test]
+fn the_idle_stop_is_off_by_default_and_at_least_a_minute() {
+    let defaults = loaded("");
+    assert_eq!(defaults.service.idle_stop_ms, 0);
+    assert_eq!(defaults.service.idle_utilization_percent, 0);
+    assert_eq!(loaded("idle_stop_ms = 0").service.idle_stop_ms, 0);
+    assert_eq!(loaded("idle_stop_ms = 60000").service.idle_stop_ms, 60_000);
+    assert_eq!(
+        loaded("idle_stop_ms = 4294967295").service.idle_stop_ms,
+        4_294_967_295
+    );
+    for refused in [
+        "idle_stop_ms = 59999",
+        "idle_stop_ms = 1",
+        "idle_stop_ms = -1",
+    ] {
+        assert_eq!(
+            warnings(refused),
+            ["ignoring 'idle_stop_ms': must be 0 (off) or between 60000 and 4294967295"]
+        );
+    }
+    assert_eq!(
+        warnings("idle_stop_ms = \"30m\""),
+        ["ignoring 'idle_stop_ms': expected an integer"]
+    );
+}
+
+#[test]
+fn the_idle_utilization_threshold_stays_below_100() {
+    assert_eq!(
+        loaded("idle_utilization_percent = 99")
+            .service
+            .idle_utilization_percent,
+        99
+    );
+    assert_eq!(
+        warnings("idle_utilization_percent = 100"),
+        ["ignoring 'idle_utilization_percent': must be between 0 and 99"]
+    );
+}
+
 /// Applies `text`, requiring success with at least one warning.
 fn warnings(text: &str) -> Vec<String> {
     let warnings = DaemonConfig::default()
@@ -523,14 +564,16 @@ fn a_reload_reports_changed_limits_and_keys_that_need_a_restart() {
     assert!(old.restart_required_changes(&old).is_empty());
 
     let new = loaded(
-        "max_held_per_uid = 2\nmax_hold_ms = 60000\nhandshake_timeout_ms = 500\nsocket_mode = \"0600\"\nsocket_path = \"/run/other.sock\"\n",
+        "max_held_per_uid = 2\nmax_hold_ms = 60000\nidle_stop_ms = 600000\nidle_utilization_percent = 5\nhandshake_timeout_ms = 500\nsocket_mode = \"0600\"\nsocket_path = \"/run/other.sock\"\n",
     );
     assert_eq!(
         old.limit_changes(&new),
         [
             "handshake_timeout_ms 10000 -> 500",
             "max_held_per_uid 8 -> 2",
-            "max_hold_ms 0 -> 60000"
+            "max_hold_ms 0 -> 60000",
+            "idle_stop_ms 0 -> 600000",
+            "idle_utilization_percent 0 -> 5"
         ]
     );
     assert_eq!(

@@ -69,7 +69,7 @@ pub struct ConfigError(pub String);
 
 /// Every key this build understands. Anything else earns a warning: a newer
 /// config must not stop an older daemon, but a typo must not be silent.
-const KNOWN_KEYS: [&str; 12] = [
+const KNOWN_KEYS: [&str; 14] = [
     "log_directory",
     "socket_path",
     "socket_mode",
@@ -82,6 +82,8 @@ const KNOWN_KEYS: [&str; 12] = [
     "devices",
     "watch_unmanaged_ms",
     "max_hold_ms",
+    "idle_stop_ms",
+    "idle_utilization_percent",
 ];
 
 const MAX_SOCKET_MODE: u32 = 0o777;
@@ -155,6 +157,23 @@ impl Reader<'_> {
         };
         if !(low..=high).contains(&value) {
             self.warn(key, &format!("must be between {documented_low} and {high}"));
+            return None;
+        }
+        Some(value)
+    }
+
+    /// Like [`Self::integer`] for a limit that is either 0 (off) or in
+    /// `low..=high`.
+    fn integer_or_off(&mut self, key: &str, low: i64, high: i64) -> Option<i64> {
+        let value = match self.table.get(key)? {
+            Value::Integer(value) => *value,
+            _ => {
+                self.warn(key, "expected an integer");
+                return None;
+            }
+        };
+        if value != 0 && !(low..=high).contains(&value) {
+            self.warn(key, &format!("must be 0 (off) or between {low} and {high}"));
             return None;
         }
         Some(value)
@@ -319,6 +338,21 @@ impl DaemonConfig {
         if let Some(value) = r.integer("max_hold_ms", 0, 0, MAX_HOLD_LIMIT_MS as i64) {
             service.max_hold_ms = value as u64;
         }
+        if let Some(value) = r.integer_or_off(
+            "idle_stop_ms",
+            crate::service::MIN_IDLE_STOP_MS as i64,
+            MAX_HOLD_LIMIT_MS as i64,
+        ) {
+            service.idle_stop_ms = value as u64;
+        }
+        if let Some(value) = r.integer(
+            "idle_utilization_percent",
+            0,
+            0,
+            crate::service::MAX_IDLE_UTILIZATION_PERCENT as i64,
+        ) {
+            service.idle_utilization_percent = value as u32;
+        }
 
         let invalid_values = r.invalid_values;
         let mut warnings = r.warnings;
@@ -440,7 +474,8 @@ impl DaemonConfig {
 
     /// The limits a reload changes, as `key old -> new`, in a fixed order:
     /// `max_connections`, `max_connections_per_uid`, `handshake_timeout_ms`,
-    /// the scheduler caps, `max_hold_ms`, then `watch_unmanaged_ms`.
+    /// the scheduler caps, `max_hold_ms`, `idle_stop_ms`,
+    /// `idle_utilization_percent`, then `watch_unmanaged_ms`.
     pub fn limit_changes(&self, new: &Self) -> Vec<String> {
         let (old, new) = (&self.service, &new.service);
         let mut changes = Vec::new();
@@ -478,6 +513,16 @@ impl DaemonConfig {
             "max_hold_ms",
             old.max_hold_ms.to_string(),
             new.max_hold_ms.to_string(),
+        );
+        compare(
+            "idle_stop_ms",
+            old.idle_stop_ms.to_string(),
+            new.idle_stop_ms.to_string(),
+        );
+        compare(
+            "idle_utilization_percent",
+            old.idle_utilization_percent.to_string(),
+            new.idle_utilization_percent.to_string(),
         );
         compare(
             "watch_unmanaged_ms",
