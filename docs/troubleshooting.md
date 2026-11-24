@@ -312,6 +312,16 @@ The administrator has set a hold limit, and your command reached it.
 if it was still running. Split long jobs so that each run fits the limit and
 resumes from a checkpoint; see [Hold limit](user-guide/run.md#hold-limit).
 
+## `the GPUs were idle for the idle limit of ...; stopping the command`
+
+The administrator has set an idle limit, and the daemon found that your
+command had not used its GPUs for that long; see
+[Idle limit](user-guide/run.md#idle-limit). `gpudog run` stopped it as at
+the hold limit. If the job was loading data or waiting for something before
+it touched the GPUs, it reached the limit before it started: do that work
+before `gpudog run`, or ask the administrator for a longer limit. Watch the
+`IDLE` column of `gpudog dash` while the job runs to see how close it is.
+
 ## `gpudog run` keeps waiting after its timeout
 
 The daemon measures `-t`, so a daemon that is stuck cannot end the wait.

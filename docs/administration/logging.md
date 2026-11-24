@@ -48,6 +48,8 @@ uid=1000 gid=1000 pid=4242 granted gpus=[0:GPU-...]
 uid=1000 gid=1000 pid=4242 released its reservation
 uid=1002 gid=1002 pid=4400 granted gpus=[1:GPU-...] hold_limit_ms=86400000
 uid=1002 gid=1002 pid=4400 still holds its reservation after its hold limit of 86400000 ms; it is kept until the client closes it
+uid=1003 gid=1003 pid=4500 granted gpus=[2:GPU-...] idle_stop_ms=1800000
+uid=1003 gid=1003 pid=4500 idle for 1800020 ms; asked the client to stop its command, and keeps the reservation until the client closes it
 uid=1001 gid=1001 pid=4300 denied: no GPU became available before the deadline
 ```
 
@@ -58,6 +60,14 @@ stops its command a few milliseconds later, and the `released` line
 follows within about 30 seconds. If it does not, a process that left the command's process
 tree, or a client other than `gpudog run`, still holds the GPUs; see
 [A job holds GPUs too long](daemon.md#a-job-holds-gpus-too-long).
+
+With [`idle_stop_ms`](configuration.md#idle-stop) set, a grant line ends
+with `idle_stop_ms=`, and the `idle for ... ms; asked the client to stop`
+line is logged once, when the job's GPUs have been idle that long. The
+`released` line normally follows within about 30 seconds, as at the hold
+limit. If the message cannot be written to the client, a warning
+`idle for ... ms; could not ask the client to stop its command (...)` is
+logged instead, and the GPUs stay reserved until the client closes them.
 
 `released its reservation` also ends a request that was cancelled while it
 waited. A request whose `-t` ran out normally ends with the `denied` line

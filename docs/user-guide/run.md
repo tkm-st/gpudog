@@ -171,6 +171,36 @@ gpudog: the command was killed by signal 9 (SIGKILL)
 *   For a shorter limit of your own, run the command under `timeout`, for
     example `gpudog run -- timeout 2h python train.py`.
 
+## Idle limit
+
+The administrator can also stop jobs whose GPUs stay idle too long
+(`idle_stop_ms`). There is none by default. With one, the `holding gpu(s)`
+line ends with it, for example `; idle limit 30m`, and `gpudog dash` shows
+how long each job's GPUs have been idle in its `IDLE` column.
+
+Your GPUs count as idle while none of your command's processes runs on
+them, or while those that do run do (almost) no compute work; the
+administrator sets how little. The idle time counts from the grant, so a
+job that spends a long time loading data before it touches a GPU can reach
+the limit before it starts. It starts again whenever your job uses its GPUs.
+On more than one GPU, the job is idle only while all of them are.
+
+When the idle time reaches the limit, `gpudog run` stops your command in
+the same way as at the [hold limit](#hold-limit), starting with:
+
+```text
+gpudog: holding gpu(s) 0 (GPU-8f6a...); idle limit 30m
+gpudog: the GPUs were idle for the idle limit of 30m; stopping the command (SIGKILL in 30s)
+```
+
+*   The `SIGTERM`, the 30 seconds before `SIGKILL`, the processes stopped
+    and the exit status are as at the hold limit. Only this line tells an
+    idle stop apart.
+*   Jobs whose GPU work does not start from your command, such as
+    `gpudog run docker run --gpus ...`, are never stopped for being idle.
+*   If the daemon restarts while your command runs, the idle limit no
+    longer applies to it.
+
 ## Output
 
 `gpudog` writes its own messages to standard error, so they do not mix with
@@ -182,7 +212,8 @@ gpudog: holding gpu(s) 0,1 (GPU-8f6a...,GPU-1c2d...)
 ```
 
 With a [hold limit](#hold-limit), the second line ends with it:
-`gpudog: holding gpu(s) 0,1 (GPU-8f6a...,GPU-1c2d...); hold limit 1d`.
+`gpudog: holding gpu(s) 0,1 (GPU-8f6a...,GPU-1c2d...); hold limit 1d`. An
+[idle limit](#idle-limit) follows the same way, as `; idle limit 30m`.
 
 The waiting line is printed once, when the request is queued. The position
 starts at `0`, the first request the daemon considers. It can change while
@@ -203,6 +234,7 @@ to the first number. Your command sees these GPUs as its CUDA numbers `0`,
 | The command ran | The command's own exit status |
 | The command was killed by signal *N* | 128 + *N*, with `gpudog: the command was killed by signal N (SIGNAME)` (see below) |
 | The command was stopped at its [hold limit](#hold-limit) | As above, usually `143` or `137`, after `gpudog: the hold limit of ... has ended` |
+| The command was stopped at its [idle limit](#idle-limit) | As above, after `gpudog: the GPUs were idle for the idle limit of ...` |
 | The command was not found (`cannot run ...`) | `127` |
 | The command is not executable | `126` |
 | Invalid command-line syntax, missing command or conflicting options | `2` |
@@ -232,7 +264,8 @@ holds the reservation, has exited (see [Reservations](../concepts.md#reservation
     not exit on them; it keeps waiting while the command cleans up.
 *   `SIGTERM` sent to `gpudog` is forwarded to the command itself, every time
     it arrives. Processes the command started do not receive it from
-    `gpudog`; only the [hold limit](#hold-limit) signals them as well. Once
+    `gpudog`; only the [hold limit](#hold-limit) and the
+    [idle limit](#idle-limit) signal them as well. Once
     the command has exited after a hold-limit stop, `SIGTERM` is not
     forwarded and `gpudog` keeps waiting (see [Hold limit](#hold-limit)). If the command is a wrapper script, start the real program with
     `exec` (for example `exec python train.py`) so that it receives `SIGTERM`.

@@ -14,6 +14,9 @@ Docker image. Protocol version is **8**. GPU process observation and
 PID/start-time process-tree classification run in the daemon. `max_hold_ms` sets a
 hold limit that the daemon sends with each grant and `gpudog run` enforces
 on its command's process tree; the daemon only logs an overdue reservation.
+`idle_stop_ms` (with `idle_utilization_percent`) is sent with each grant
+too: when observation finds a holder's GPUs idle that long, the daemon sends
+`IdleStop` once and `gpudog run` stops the command the same way.
 Observed usage
 blocks new grants independently of labels; failures/staleness pause new
 allocation without stopping jobs or queue deadlines. `watch_unmanaged_ms`
@@ -148,6 +151,9 @@ deploy the EOL Debian 10 build/test stages.
 *   NVML/procfs reads and process-tree classification run on a blocking worker
     outside that mutex. Usage blocks allocation regardless of process labels.
     Never clear pause/busy state on query failure or revoke running reservations.
+    Idle detection (`idle`) counts nothing it cannot attribute as idle, and
+    a failed or dropped observation restarts every idle time; a failed
+    `IdleStop` write never ends the hold.
     Static `--num-gpus` inventories bypass observation for wire tests only.
 *   NVML and descriptors use RAII/Drop. Workspace `unsafe_code` is denied.
 *   Wire strings are `Vec<u8>` and bounds count bytes. Existing layout or
@@ -342,6 +348,7 @@ the gates where it says `verifier`, with any directory under `tmp/` as
 | `gpudog-daemon` | `daemon_log` | Non-blocking stderr/journal logging |
 | `gpudog-daemon` | `gpu_processes` | Managed-UUID NVML queries and host procfs facts |
 | `gpudog-daemon` | `process_watcher` | PID/start-time descendant cache; usage and labels are separate |
+| `gpudog-daemon` | `idle` | Per-reservation idle judgement and idle clock for `idle_stop_ms` |
 
 `gpudog-client` and `gpudog-daemon` depend on `gpudog-core` and never on
 each other, except as dev-dependencies for tests that run a real client

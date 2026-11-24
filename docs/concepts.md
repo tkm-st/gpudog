@@ -143,6 +143,12 @@ The administrator can also set a hold limit: how long one `gpudog run` may
 keep its GPUs, the same for every user. There is none by default. With one, `gpudog run` stops your command when it ends; see
 [Hold limit](user-guide/run.md#hold-limit).
 
+## Idle limit
+
+The administrator can also set an idle limit: how long a job's GPUs may
+stay unused before `gpudog run` stops it. There is none by default; see
+[Idle limit](user-guide/run.md#idle-limit).
+
 ## Identity
 
 The daemon identifies users by the uid that the kernel reports for the socket
@@ -160,7 +166,8 @@ a GPU, but it cannot stop a user who deliberately bypasses it:
     if no reservation holds it. If the daemon cannot check GPU usage, it stops
     granting new reservations until it can; running jobs are not affected.
     The daemon never stops any process; only `gpudog run` stops its own
-    command, at a [hold limit](user-guide/run.md#hold-limit). See
+    command, at a [hold limit](user-guide/run.md#hold-limit) or an
+    [idle limit](user-guide/run.md#idle-limit). See
     [Unmanaged processes](administration/unmanaged-processes.md).
 *   GPUs are allocated whole. GPU sharing is not supported, and MIG instances
     or GPUs with MIG enabled are rejected.

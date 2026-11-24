@@ -34,10 +34,12 @@
 | `max_held_per_uid` | integer (1–1,000,000) | `8` | Maximum GPUs one user may hold at once. Set it below the number of GPUs if one user's large request must not be able to keep the whole machine idle while it waits (see [Security](security.md#untrusted-input)). |
 | `max_queued_per_uid` | integer (1–1,000,000) | `8` | Maximum requests one user may have waiting at once. |
 | `max_hold_ms` | integer (0–4,294,967,295, about 49.7 days) | `0` | Milliseconds one request may hold its GPUs, counted from the grant. `0` means no limit. See [Hold limit](#hold-limit). |
+| `idle_stop_ms` | integer: `0`, or 60,000–4,294,967,295 | `0` | Milliseconds one request's GPUs may stay idle, counted from the grant, before `gpudog run` stops the command. `0` means never. See [Idle stop](#idle-stop). |
+| `idle_utilization_percent` | integer (0–99) | `0` | Highest SM utilization, in percent, at which a job's GPU processes still count as idle. See [Idle stop](#idle-stop). |
 | `devices` | array of strings | all GPUs | GPUs this daemon manages, as `GPU-<uuid>` strings from `nvidia-smi -L`. See [Managing some GPUs](#managing-some-gpus). |
 
-A value of `0` for a limit stops startup, except for `max_hold_ms`, where
-`0` means no limit. A negative value, or one above the upper bound, is
+A value of `0` for a limit stops startup, except for `max_hold_ms` and
+`idle_stop_ms`, where `0` means no limit, and `idle_utilization_percent`. A negative value, or one above the upper bound, is
 ignored with a warning, and the default is used.
 
 ## Example
@@ -79,6 +81,59 @@ it only once their GPUs are granted, or in `gpudog dash` next to other jobs.
     time is limited by `gpudog run -t` instead.
 *   A reload changes the limit for later grants only. Jobs that already
     hold GPUs keep the limit they were given.
+
+## Idle stop
+
+`idle_stop_ms` stops jobs that keep their GPUs without using them, such as
+a forgotten notebook or a training script stuck waiting for input. For
+example, to stop a job whose GPUs have been idle for 30 minutes:
+
+```toml
+idle_stop_ms = 1800000
+```
+
+A job is idle while either of these holds on every GPU it was granted:
+
+*   None of its processes runs on its GPUs. This includes the time before
+    the job first uses them, for example while it loads data: the idle time
+    counts from the grant.
+*   Each of its processes on its GPUs runs at or below
+    `idle_utilization_percent` SM utilization (the GPU's compute load, as
+    NVML samples it). With the default `0`, only a process that did no
+    compute work at all since the previous observation counts as idle.
+
+The idle time starts again whenever the job uses one of its GPUs. Choose a
+value longer than the jobs your users take to start (30 minutes or more is
+a reasonable start), and tell them before you set it. Values from 1 to
+59,999 are refused, so the shortest is one minute.
+
+*   When the idle time reaches the limit, the daemon tells `gpudog run`, which
+    stops the command as it does at the [hold limit](#hold-limit): `SIGTERM`
+    to the command and every process it started, then `SIGKILL` to those
+    still running 30 seconds later. The daemon logs it once; see
+    [Request lines](logging.md#request-lines). It never stops a process or
+    takes GPUs back itself.
+*   A job is never counted as idle when the daemon cannot tell. That
+    covers a failed GPU observation, a GPU process whose owner cannot be
+    read, a job whose own `gpudog` process cannot be found (a containerized
+    daemon without `--pid=host`), and GPU work of the same user that did not
+    start from the command: `gpudog run docker run --gpus ...`, a worker
+    started with `setsid` or as a daemon, or CUDA MPS, whose server runs
+    the work. Such jobs are not stopped for being idle. Another user's
+    process on the job's GPU does not make the job count as busy.
+*   A GPU that does not report per-process utilization counts a job as idle
+    only when none of its processes runs there.
+*   The daemon reads utilization at each observation (`watch_unmanaged_ms`).
+    NVML keeps only a short history of samples, so with a long interval a
+    burst of work between two observations may be missed.
+*   `gpudog run` prints the limit when the GPUs are granted, and
+    `gpudog dash` shows each job's idle time against it in the `IDLE`
+    column.
+*   A reload changes both settings for later grants only. Jobs that already
+    hold GPUs keep the limit and threshold they were given.
+*   Without GPU process observation (the test-only `--num-gpus` inventory),
+    no job is ever found idle; the daemon warns
+    `idle_stop_ms has no effect: GPU processes are not observed, so no job is ever found idle`.
 
 ## Managing some GPUs
 
@@ -141,8 +196,8 @@ $ docker kill -s HUP gpudogd       # Docker
 
 *   These settings take effect at once, for new connections, requests and
     observations: `max_connections`, `max_connections_per_uid`, `handshake_timeout_ms`, `watch_unmanaged_ms`,
-    `max_held_per_uid`, `max_queued_per_uid` and `max_hold_ms` (for later
-    grants only). The log shows what changed,
+    `max_held_per_uid`, `max_queued_per_uid`, and `max_hold_ms`,
+    `idle_stop_ms` and `idle_utilization_percent` (for later grants only). The log shows what changed,
     for example `configuration reloaded: max_held_per_uid 8 -> 4`.
 *   A changed `devices` takes effect at once too, as
     `configuration reloaded: devices`, with one log line per GPU added

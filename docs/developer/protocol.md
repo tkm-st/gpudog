@@ -42,12 +42,13 @@ other than `0` and `1`.
 | 2 | `hello_ack` | daemon → client | `u32 version` |
 | 3 | `acquire` | client → daemon | see below |
 | 4 | `queued` | daemon → client | `u32 position` |
-| 5 | `granted` | daemon → client | `gpu_list gpus` (never empty), `uuid_list uuids` (same length; `uuids[i]` names `gpus[i]`), `u64 hold_limit_ms` (see below) |
+| 5 | `granted` | daemon → client | `gpu_list gpus` (never empty), `uuid_list uuids` (same length; `uuids[i]` names `gpus[i]`), `u64 hold_limit_ms`, `u64 idle_limit_ms` (see below) |
 | 6 | `denied` | daemon → client | `u16 reason`, `string detail` |
 | 7 | `ping` | client → daemon | empty |
 | 8 | `pong` | daemon → client | empty |
 | 9 | `status` | client → daemon | empty |
 | 10 | `status_reply` | daemon → client | see below |
+| 11 | `idle_stop` | daemon → client | `u64 idle_ms` (see below) |
 
 ### `acquire`
 
@@ -69,6 +70,23 @@ means no limit, and the value is at most `0xFFFFFFFF`. The client is
 expected to stop its command when the limit ends. The daemon never revokes
 the reservation: it holds the GPUs until the connection closes, and logs
 once that the limit has passed.
+
+`idle_limit_ms` is how long, in milliseconds, the reservation's GPUs may
+stay idle before the daemon sends `idle_stop`: the daemon's `idle_stop_ms`
+at the time of the grant. `0` means never, and the value is at most
+`0xFFFFFFFF`. What counts as idle is described under
+[Idle stop](../administration/configuration.md#idle-stop).
+
+### `idle_stop`
+
+Sent by the daemon, at most once, to a holder whose GPUs stayed idle for
+its `granted.idle_limit_ms`. `idle_ms` is how long they had been idle. The
+client is expected to stop its command, as at the hold limit. The daemon
+keeps the reservation until the connection closes; a holder that ignores the
+message keeps its GPUs. After the grant this is the only message the daemon
+sends unasked, apart from `pong`, so a client that holds a reservation and
+does not read its connection only leaves `idle_stop` unread in the socket
+buffer.
 
 ### `status_reply`
 
@@ -126,6 +144,8 @@ A `reservation` entry is:
 | `num_gpus` | `u32` | GPUs wanted |
 | `age_ms` | `u64` | Time since the grant, or since the request was queued |
 | `hold_limit_ms` | `u64` | The holder's `granted.hold_limit_ms`; `0` for no limit, and always `0` while waiting. At most `0xFFFFFFFF`. |
+| `idle_limit_ms` | `u64` | The holder's `granted.idle_limit_ms`; `0` for never, and always `0` while waiting. At most `0xFFFFFFFF`. |
+| `idle_ms` | `u64` | How long the holder's GPUs have been idle without a break, at the daemon's last observation; `0` while in use, unknown, without an idle limit, or waiting |
 | `position` | `u32` | Position in the daemon's service order, starting at `0`; always `0` for holders. The daemon orders by load, so it can change. |
 | `command` | `string` | Client-reported command line, sanitised to printable ASCII |
 
@@ -201,6 +221,9 @@ it does. The rules below say what such a change must do.
     [Scheduling policy](architecture.md#scheduling-policy).
 *   Version 7 appends `u64 hold_limit_ms` to `granted` and inserts one after
     `age_ms` in each `reservation` entry.
+*   Version 8 appends `u64 idle_limit_ms` to `granted`, inserts
+    `u64 idle_limit_ms` and `u64 idle_ms` after `hold_limit_ms` in each
+    `reservation` entry, and adds `idle_stop` (type 11).
 
 ## Device identity
 

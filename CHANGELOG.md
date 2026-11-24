@@ -42,12 +42,34 @@ release's section.
     The daemon never revokes it.
 *   `gpudog dash` shows a holder's hold limit in the `HELD` column, as
     `<held> / <limit>`.
+*   `idle_stop_ms` and `idle_utilization_percent` in `config.toml`: how long
+    a request's GPUs may stay idle, counted from the grant, and the highest
+    SM utilization that still counts as idle. `idle_stop_ms` defaults to
+    `0`, never, and is otherwise at least `60000`; the threshold defaults to
+    `0` and is at most `99`. A reload applies them to later grants only.
+*   With an idle limit, `gpudog run` ends its `holding gpu(s)` line with
+    `; idle limit <duration>`. When the daemon finds the GPUs idle for that
+    long, it prints
+    `the GPUs were idle for the idle limit of <duration>; stopping the command (SIGKILL in 30s)`
+    and stops the command as at the hold limit.
+*   The daemon's grant line ends with `idle_stop_ms=<ms>` when there is an
+    idle limit. Reaching it is logged once:
+    `idle for <ms> ms; asked the client to stop its command, and keeps the reservation until the client closes it`,
+    or, when the message cannot be sent, a warning
+    `idle for <ms> ms; could not ask the client to stop its command (...); the reservation is kept until the client closes it`.
+    With `idle_stop_ms` set and no GPU process observation, the daemon warns
+    `idle_stop_ms has no effect: GPU processes are not observed, so no job is ever found idle`.
+*   `gpudog dash` shows an `IDLE` column, `<idle> / <limit>`, while some
+    holder has an idle limit.
 
 ### Changed
 
-*   Wire protocol version 7. `granted` and each `reservation` entry of
-    `status_reply` carry a `hold_limit_ms`. Clients and daemons of version 6
-    refuse each other with `protocol version mismatch`; upgrade both.
+*   Wire protocol version 8. `granted` carries a `hold_limit_ms` and an
+    `idle_limit_ms`, each `reservation` entry of `status_reply` carries
+    `hold_limit_ms`, `idle_limit_ms` and `idle_ms`, and the new `idle_stop`
+    message asks a holder to stop its command. Clients and daemons of
+    earlier versions refuse each other with `protocol version mismatch`;
+    upgrade both.
 
 ## [0.0.1] - 2026-11-15
 

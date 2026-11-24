@@ -58,6 +58,11 @@ The sections are:
     A job past its limit is not marked; its time held is simply the larger
     one, as in `1d 2h / 1d 0h`. Without a limit, only the time held is
     shown.
+    With an [idle limit](run.md#idle-limit), an `IDLE` column shows how
+    long each job's GPUs have been idle without a break, against the limit:
+    `4m 10s / 30m 0s`. It shows `0s` while the GPUs are in use or the
+    daemon cannot tell, and `-` for a job granted without a limit. The
+    column appears only while some job has an idle limit.
 *   **Waiting**: queued requests in queue order, with how many GPUs each wants.
 *   **GPU processes**: every process the daemon sees using a GPU, including
     processes started without `gpudog`.
