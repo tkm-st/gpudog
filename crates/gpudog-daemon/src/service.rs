@@ -1937,41 +1937,123 @@ async fn handle_acquire(
     if granted {
         // Hold the reservation until the client's fd closes. The fd *is*
         // the lock.
-        let deadline = shared
-            .lock()
-            .sessions
-            .get(&id)
-            .and_then(|session| session.hold_deadline.map(|at| (at, session.hold_limit_ms)));
-        hold(shared, line, peer, deadline).await
+        let (deadline, idle_reached) = {
+            let state = shared.lock();
+            let session = state.sessions.get(&id);
+            (
+                session.and_then(|session| {
+                    session.hold_deadline.map(|at| (at, session.hold_limit_ms))
+                }),
+                session
+                    .filter(|session| session.idle.is_some())
+                    .map(|session| session.idle_reached.clone()),
+            )
+        };
+        hold(shared, line, peer, id, deadline, idle_reached).await
     } else {
         Ok(())
     }
 }
 
 /// [`await_peer_close`] for a holder. When its hold limit ends, logs once
-/// that it has, and keeps holding: the client stops its command, and the
-/// daemon never revokes a reservation.
+/// that it has; when `idle_reached` is notified, sends `IdleStop` once. Either
+/// way it keeps holding: the client stops its command, and the daemon never
+/// revokes a reservation. Only the end of the peer's connection, or garbage
+/// from it, ends the hold; a failed `IdleStop` write is logged and the
+/// reservation kept.
 async fn hold(
     shared: &Shared,
     line: &mut Line,
     peer: &PeerCredentials,
-    deadline: Option<(Instant, u64)>,
+    id: RequestId,
+    mut deadline: Option<(Instant, u64)>,
+    mut idle_reached: Option<Arc<Notify>>,
 ) -> Result<(), SessionError> {
-    let closed = await_peer_close(line);
-    tokio::pin!(closed);
-    if let Some((at, limit_ms)) = deadline {
+    loop {
         tokio::select! {
-            result = &mut closed => return result,
-            () = tokio::time::sleep_until(at.into()) => shared.log(
-                LogLevel::Access,
-                &format!(
-                    "{peer} still holds its reservation after its hold limit of {limit_ms} ms; \
-                     it is kept until the client closes it"
-                ),
-            ),
+            // `Framed::next` is cancel-safe: a partial frame stays buffered.
+            message = read(line) => match message? {
+                None => return Ok(()),
+                Some(Message::Ping) => write(line, Message::Pong).await?,
+                Some(_) => return Err(SessionError::Protocol(ProtocolError::InvalidMessage)),
+            },
+            () = async {
+                if let Some((at, _)) = deadline {
+                    tokio::time::sleep_until(at.into()).await;
+                }
+            }, if deadline.is_some() => {
+                let (_, limit_ms) = deadline.take().expect("guarded by is_some");
+                shared.log(
+                    LogLevel::Access,
+                    &format!(
+                        "{peer} still holds its reservation after its hold limit of {limit_ms} ms; \
+                         it is kept until the client closes it"
+                    ),
+                );
+            }
+            () = async {
+                if let Some(reached) = &idle_reached {
+                    reached.notified().await;
+                }
+            }, if idle_reached.is_some() => {
+                idle_reached = None;
+                send_idle_stop(shared, line, peer, id).await;
+            }
         }
     }
-    closed.await
+}
+
+/// How long [`send_idle_stop`] waits for its write.
+const IDLE_STOP_WRITE_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Tells a holder whose GPUs stayed idle for its idle limit to stop its
+/// command, and logs it. A write that fails or stalls is logged only: the
+/// session goes on holding.
+async fn send_idle_stop(shared: &Shared, line: &mut Line, peer: &PeerCredentials, id: RequestId) {
+    let Some(idle_ms) = shared
+        .lock()
+        .sessions
+        .get(&id)
+        .and_then(|session| session.idle_stop_ms)
+    else {
+        return;
+    };
+    let sent = tokio::time::timeout(
+        IDLE_STOP_WRITE_TIMEOUT,
+        write(line, protocol::IdleStop { idle_ms }),
+    )
+    .await;
+    match sent {
+        Ok(Ok(())) => shared.log(
+            LogLevel::Access,
+            &format!(
+                "{peer} idle for {idle_ms} ms; asked the client to stop its command, \
+                 and keeps the reservation until the client closes it"
+            ),
+        ),
+        Ok(Err(error)) => {
+            let why = match error {
+                SessionError::Transport(error) => errno_text(&error),
+                SessionError::Protocol(error) => error.to_string(),
+                SessionError::HandshakeTimeout => "timed out".to_owned(),
+            };
+            shared.log(
+                LogLevel::Warning,
+                &format!(
+                    "{peer} idle for {idle_ms} ms; could not ask the client to stop its \
+                     command ({why}); the reservation is kept until the client closes it"
+                ),
+            )
+        }
+        Err(_) => shared.log(
+            LogLevel::Warning,
+            &format!(
+                "{peer} idle for {idle_ms} ms; could not ask the client to stop its command \
+                 within {} seconds; the reservation is kept until the client closes it",
+                IDLE_STOP_WRITE_TIMEOUT.as_secs()
+            ),
+        ),
+    }
 }
 
 /// Reads until the peer goes away, answering pings. A client holding or

@@ -2293,3 +2293,51 @@ async fn an_idle_limit_without_observation_is_warned_about() {
         .count();
     assert_eq!(warnings, 2);
 }
+
+#[tokio::test]
+async fn a_holder_idle_for_its_limit_is_asked_once_to_stop_and_keeps_its_gpus() {
+    let (service, _source, events) = idle_service(150, Ok(vec![]));
+    let mut holder = hold_gpu_zero(&service).await;
+    let Some(Message::IdleStop(stop)) = tokio::time::timeout(Duration::from_secs(5), holder.recv())
+        .await
+        .unwrap()
+    else {
+        panic!("expected an idle stop");
+    };
+    assert!(stop.idle_ms >= 150, "{stop:?}");
+    // Nothing more is sent, and the reservation is kept, however long the
+    // client takes.
+    assert!(
+        tokio::time::timeout(Duration::from_millis(300), holder.recv())
+            .await
+            .is_err()
+    );
+    assert!(service.with_scheduler(|s| s.holds(1)));
+    holder.send(Message::Ping).await;
+    assert_eq!(holder.recv().await, Some(Message::Pong));
+    let stops = events
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(level, message)| {
+            *level == LogLevel::Access && message.contains("asked the client to stop its command")
+        })
+        .count();
+    assert_eq!(stops, 1);
+    drop(holder);
+    eventually(|| !service.with_scheduler(|s| s.holds(1))).await;
+}
+
+#[tokio::test]
+async fn a_holder_that_uses_its_gpus_is_never_asked_to_stop() {
+    let me = std::process::id();
+    let (service, source, _) = idle_service(300, Ok(vec![]));
+    let mut holder = hold_gpu_zero(&service).await;
+    *source.lock().unwrap() = Ok(vec![on_gpu_zero(me, Some(50))]);
+    assert!(
+        tokio::time::timeout(Duration::from_millis(800), holder.recv())
+            .await
+            .is_err()
+    );
+    assert!(service.with_scheduler(|s| s.holds(1)));
+}
