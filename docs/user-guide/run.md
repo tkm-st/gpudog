@@ -180,12 +180,13 @@ how long each job's GPUs have been idle in its `IDLE` column. To know the
 limit before you start, ask your administrator, or look at that column
 while other jobs run.
 
-Your GPUs count as idle while none of your command's processes runs on
-them, or while those that do run do (almost) no work on them (compute,
-memory, video encoding or decoding); the administrator sets how little. The idle time counts from the grant, so a
-job that spends a long time loading data before it touches a GPU can reach
-the limit before it starts. It starts again whenever your job uses its GPUs.
-On more than one GPU, the job is idle only while all of them are.
+Your GPUs count as idle while none of your command's processes runs on them,
+or while those that do run do (almost) no work on them (compute, memory,
+video encoding or decoding); the administrator sets how little. The idle
+time counts from the grant, so a job that spends a long time loading data
+before it touches a GPU can reach the limit before it starts. It starts
+again whenever your job uses its GPUs. On more than one GPU, the job is idle
+only while all of them are.
 
 When the idle time reaches the limit, `gpudog run` stops your command in
 the same way as at the [hold limit](#hold-limit), starting with:

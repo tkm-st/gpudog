@@ -51,7 +51,9 @@ release's section.
     `; idle limit <duration>`. When the daemon finds the GPUs idle for that
     long, it prints
     `the GPUs were idle for the idle limit of <duration>; stopping the command (SIGKILL in 30s)`
-    and stops the command as at the hold limit.
+    and stops the command as at the hold limit. If something else reads
+    the reservation's connection, it prints
+    `unexpected data on the reservation's connection (does the command read it?); the idle limit is no longer watched`.
 *   The daemon's grant line ends with `idle_stop_ms=<ms>` when there is an
     idle limit. Reaching it is logged once:
     `idle for <ms> ms; asked the client to stop its command; the reservation is kept until the client closes it`,

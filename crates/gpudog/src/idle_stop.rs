@@ -45,9 +45,9 @@ pub(crate) fn watch(reservation: &OwnedFd) -> std::io::Result<oneshot::Receiver<
 /// Why [`next_idle_stop`] gave up.
 #[derive(Debug, PartialEq, Eq)]
 enum Ending {
-    /// The connection ended between frames.
+    /// The connection ended.
     Closed,
-    /// A frame was cut short, malformed or not one the daemon sends.
+    /// A frame was malformed or not one the daemon sends.
     Garbled,
 }
 
@@ -82,11 +82,13 @@ fn next_idle_stop(mut stream: impl Read) -> Result<u64, Ending> {
 }
 
 /// `read_exact` that also waits out a socket the command made
-/// non-blocking. A frame cut short is [`Ending::Garbled`].
+/// non-blocking. A connection that ends mid-frame is [`Ending::Closed`]:
+/// a command reading the socket takes bytes, it does not close it.
 fn read_all(stream: &mut impl Read, mut buffer: &mut [u8]) -> Result<(), Ending> {
     while !buffer.is_empty() {
         match stream.read(buffer) {
-            Ok(0) => return Err(Ending::Garbled),
+            // The daemon went away mid-frame.
+            Ok(0) => return Err(Ending::Closed),
             Ok(read) => buffer = &mut buffer[read..],
             Err(error)
                 if matches!(
@@ -96,7 +98,7 @@ fn read_all(stream: &mut impl Read, mut buffer: &mut [u8]) -> Result<(), Ending>
             {
                 std::thread::sleep(std::time::Duration::from_millis(10));
             }
-            Err(_) => return Err(Ending::Garbled),
+            Err(_) => return Err(Ending::Closed),
         }
     }
     Ok(())
@@ -132,11 +134,16 @@ mod tests {
             next_idle_stop(&frames(&[Message::Status])[..]),
             Err(Ending::Garbled)
         );
+        // Cut short: the daemon went away mid-frame.
         let bytes = frames(&[IdleStop { idle_ms: 5 }.into()]);
         assert_eq!(
             next_idle_stop(&bytes[..bytes.len() - 1]),
-            Err(Ending::Garbled)
+            Err(Ending::Closed)
         );
-        assert_eq!(next_idle_stop(&bytes[..2]), Err(Ending::Garbled));
+        assert_eq!(next_idle_stop(&bytes[..2]), Err(Ending::Closed));
+        // A frame no daemon sends, or one that does not decode.
+        let mut bad = frames(&[IdleStop { idle_ms: 5 }.into()]);
+        bad[4] = 0xEE;
+        assert_eq!(next_idle_stop(&bad[..]), Err(Ending::Garbled));
     }
 }

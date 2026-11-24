@@ -40,7 +40,7 @@
 
 A value of `0` for a limit stops startup, except for `max_hold_ms` and
 `idle_stop_ms` (where `0` means no limit) and `idle_utilization_percent`
-(where `0` is the default). A negative value, or one above the upper bound,
+(where `0` is allowed, and the default). A negative value, or one above the upper bound,
 is ignored with a warning, and the default is used.
 
 ## Example

@@ -322,6 +322,16 @@ it touched the GPUs, it reached the limit before it started: do that work
 before `gpudog run`, or ask the administrator for a longer limit. Watch the
 `IDLE` column of `gpudog dash` while the job runs to see how close it is.
 
+## `unexpected data on the reservation's connection`
+
+`gpudog run` watches the connection that holds your GPUs for the daemon's
+idle stop, and your command inherits that connection. Something other than
+the daemon's messages arrived on it, usually because the command, or a
+program it started, reads from inherited descriptors. From then on the
+[idle limit](user-guide/run.md#idle-limit) no longer applies to this run;
+your GPUs stay reserved as usual. Have the command leave descriptors it did
+not open alone.
+
 ## `gpudog run` keeps waiting after its timeout
 
 The daemon measures `-t`, so a daemon that is stuck cannot end the wait.
