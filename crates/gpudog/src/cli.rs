@@ -6,8 +6,8 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
 use gpudog_core::protocol::PROTOCOL_VERSION;
 
-const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), " (protocol v7)");
-const _: () = assert!(PROTOCOL_VERSION == 7, "update VERSION");
+const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), " (protocol v8)");
+const _: () = assert!(PROTOCOL_VERSION == 8, "update VERSION");
 
 #[derive(Debug, Parser)]
 #[command(

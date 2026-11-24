@@ -294,6 +294,16 @@ impl Client {
                 "client has no GPU reservation",
             ));
         }
+        // `into_inner` drops bytes already read past the grant. The daemon
+        // sends nothing so soon (an idle stop comes a minute after the grant
+        // at the earliest), so any such bytes are a broken daemon, not a
+        // message to lose quietly.
+        if !self.line.read_buffer().is_empty() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "the daemon sent more data after the grant",
+            ));
+        }
         let stream = self.line.into_inner().into_std()?;
         stream.set_nonblocking(false)?;
         let fd = OwnedFd::from(stream);

@@ -82,6 +82,7 @@ mod tests {
             gpus: gpus.to_vec(),
             uuids: gpus.iter().map(|i| format!("GPU-static-{i}")).collect(),
             hold_limit_ms: 0,
+            idle_limit_ms: 0,
         }
     }
 

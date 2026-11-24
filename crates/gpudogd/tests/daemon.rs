@@ -160,6 +160,7 @@ async fn serves_a_reservation_and_shuts_down_cleanly_on_sigterm() {
             gpus: vec![0, 1],
             uuids: vec!["GPU-static-0".into(), "GPU-static-1".into()],
             hold_limit_ms: 0,
+            idle_limit_ms: 0,
         })
     );
 
@@ -170,7 +171,7 @@ async fn serves_a_reservation_and_shuts_down_cleanly_on_sigterm() {
     // Journal format: one priority-prefixed line per event.
     for expected in [
         format!(
-            "<6>gpudogd {} (protocol v7) starting",
+            "<6>gpudogd {} (protocol v8) starting",
             env!("CARGO_PKG_VERSION")
         ),
         format!("<6>loaded configuration from {}", config.display()),
@@ -190,7 +191,7 @@ async fn serves_a_reservation_and_shuts_down_cleanly_on_sigterm() {
     }
     assert!(stderr.lines().all(|l| l.starts_with('<')), "{stderr}");
     let starting = format!(
-        "<6>gpudogd {} (protocol v7) starting",
+        "<6>gpudogd {} (protocol v8) starting",
         env!("CARGO_PKG_VERSION")
     );
     assert_eq!(
@@ -362,7 +363,7 @@ fn the_version_names_the_protocol() {
     assert!(output.status.success());
     assert_eq!(
         String::from_utf8(output.stdout).unwrap(),
-        format!("gpudogd {} (protocol v7)\n", env!("CARGO_PKG_VERSION"))
+        format!("gpudogd {} (protocol v8)\n", env!("CARGO_PKG_VERSION"))
     );
 }
 
@@ -725,6 +726,7 @@ async fn sighup_applies_a_changed_devices_list() {
             gpus: vec![0],
             uuids: vec!["GPU-static-0".into()],
             hold_limit_ms: 0,
+            idle_limit_ms: 0,
         })
     );
 
@@ -752,6 +754,7 @@ async fn sighup_applies_a_changed_devices_list() {
             gpus: vec![1, 2],
             uuids: vec!["GPU-static-1".into(), "GPU-static-2".into()],
             hold_limit_ms: 0,
+            idle_limit_ms: 0,
         })
     );
 

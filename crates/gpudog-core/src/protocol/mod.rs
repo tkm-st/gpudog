@@ -48,7 +48,10 @@ mod tests;
 /// `ReservationInfo`: the daemon orders its queue itself.
 /// v7 adds `hold_limit_ms` to `Granted` and `ReservationInfo`: how long the
 /// daemon's `max_hold_ms` lets the reservation be held.
-pub const PROTOCOL_VERSION: u32 = 7;
+/// v8 adds `idle_limit_ms` to `Granted`, `idle_limit_ms` and `idle_ms` to
+/// `ReservationInfo`, and the [`IdleStop`] message the daemon sends a holder
+/// whose GPUs stayed idle for its `idle_stop_ms`.
+pub const PROTOCOL_VERSION: u32 = 8;
 
 /// Size of the little-endian length prefix that precedes every frame body.
 pub const LENGTH_PREFIX_SIZE: usize = 4;
@@ -98,6 +101,7 @@ pub enum MessageType {
     Pong = 8,
     Status = 9,
     StatusReply = 10,
+    IdleStop = 11,
 }
 
 impl TryFrom<u16> for MessageType {
@@ -115,6 +119,7 @@ impl TryFrom<u16> for MessageType {
             8 => Self::Pong,
             9 => Self::Status,
             10 => Self::StatusReply,
+            11 => Self::IdleStop,
             _ => return Err(ProtocolError::UnknownMessageType),
         })
     }
@@ -268,6 +273,19 @@ pub struct Granted {
     /// grant; 0 means no limit. The client stops its command when it ends;
     /// the daemon never revokes the reservation.
     pub hold_limit_ms: u64,
+    /// Milliseconds the reservation's GPUs may stay idle before the daemon
+    /// sends [`IdleStop`]; 0 means never. At most [`MAX_HOLD_LIMIT_MS`].
+    pub idle_limit_ms: u64,
+}
+
+/// Sent by the daemon to a holder whose GPUs stayed idle for its
+/// `Granted::idle_limit_ms`: the client should stop its command. Sent at
+/// most once per reservation, which the daemon keeps until the client
+/// closes its connection.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct IdleStop {
+    /// How long the GPUs had been idle, in milliseconds.
+    pub idle_ms: u64,
 }
 
 /// Terminal failure for a request.
@@ -303,6 +321,12 @@ pub struct ReservationInfo {
     /// `Granted::hold_limit_ms` given to this holder; 0 means no limit, and
     /// it is always 0 for a waiting request.
     pub hold_limit_ms: u64,
+    /// `Granted::idle_limit_ms` given to this holder; 0 means never, and it
+    /// is always 0 for a waiting request.
+    pub idle_limit_ms: u64,
+    /// How long the holder's GPUs have been idle without a break, as the
+    /// daemon last observed; 0 while in use or unknown.
+    pub idle_ms: u64,
     /// Queue position; always 0 for a holder.
     pub position: u32,
     /// `Acquire::command`, echoed verbatim. Untrusted text.
@@ -380,6 +404,7 @@ pub enum Message {
     /// purpose: selective queries about other users would be a disclosure knob.
     Status,
     StatusReply(StatusReply),
+    IdleStop(IdleStop),
 }
 
 macro_rules! impl_from_payload {
@@ -398,7 +423,8 @@ impl_from_payload!(
     Queued,
     Granted,
     Denied,
-    StatusReply
+    StatusReply,
+    IdleStop
 );
 
 impl Message {
@@ -415,6 +441,7 @@ impl Message {
             Self::Pong => MessageType::Pong,
             Self::Status => MessageType::Status,
             Self::StatusReply(_) => MessageType::StatusReply,
+            Self::IdleStop(_) => MessageType::IdleStop,
         }
     }
 }
@@ -542,7 +569,7 @@ fn validate_granted(msg: &Granted) -> Result<(), ProtocolError> {
     if msg.uuids.len() != msg.gpus.len() {
         return Err(ProtocolError::InvalidMessage);
     }
-    if msg.hold_limit_ms > MAX_HOLD_LIMIT_MS {
+    if msg.hold_limit_ms > MAX_HOLD_LIMIT_MS || msg.idle_limit_ms > MAX_HOLD_LIMIT_MS {
         return Err(ProtocolError::ValueOutOfRange);
     }
     validate_gpu_list(&msg.gpus)?;
@@ -562,6 +589,7 @@ fn validate_reservation(info: &ReservationInfo) -> Result<(), ProtocolError> {
     validate_gpu_list(&info.gpus)?;
     if info.num_gpus > MAX_GPU_COUNT
         || info.hold_limit_ms > MAX_HOLD_LIMIT_MS
+        || info.idle_limit_ms > MAX_HOLD_LIMIT_MS
         || exceeds(info.command.len(), MAX_COMMAND_SIZE)
     {
         return Err(ProtocolError::ValueOutOfRange);
@@ -675,6 +703,8 @@ impl Writer {
         self.u32(info.num_gpus);
         self.u64(info.age_ms);
         self.u64(info.hold_limit_ms);
+        self.u64(info.idle_limit_ms);
+        self.u64(info.idle_ms);
         self.u32(info.position);
         self.bytes(&info.command);
     }
@@ -708,7 +738,9 @@ pub fn encode(msg: &Message) -> Result<Vec<u8>, ProtocolError> {
             w.gpu_list(&value.gpus);
             w.uuid_list(&value.uuids);
             w.u64(value.hold_limit_ms);
+            w.u64(value.idle_limit_ms);
         }
+        Message::IdleStop(value) => w.u64(value.idle_ms),
         Message::Denied(value) => {
             validate_denied(value)?;
             w.u16(value.reason.0);
@@ -878,7 +910,7 @@ impl<'a> Reader<'a> {
 
     fn reservations(&mut self) -> Result<Vec<ReservationInfo>, ProtocolError> {
         /// The fixed fields plus two empty length prefixes.
-        const MIN_RESERVATION_BYTES: usize = 8 + 4 + 4 + 4 + 4 + 8 + 8 + 4 + 4;
+        const MIN_RESERVATION_BYTES: usize = 8 + 4 + 4 + 4 + 4 + 8 + 8 + 8 + 8 + 4 + 4;
         let count = self.count(MAX_STATUS_ENTRIES, MIN_RESERVATION_BYTES)?;
         (0..count)
             .map(|_| {
@@ -890,6 +922,8 @@ impl<'a> Reader<'a> {
                     num_gpus: self.u32()?,
                     age_ms: self.u64()?,
                     hold_limit_ms: self.u64()?,
+                    idle_limit_ms: self.u64()?,
+                    idle_ms: self.u64()?,
                     position: self.u32()?,
                     command: self.bytes()?,
                 })
@@ -986,6 +1020,7 @@ pub fn decode_body(buffer: &[u8]) -> Result<Message, ProtocolError> {
                 gpus: r.gpu_list()?,
                 uuids: r.uuid_list()?,
                 hold_limit_ms: r.u64()?,
+                idle_limit_ms: r.u64()?,
             };
             validate_granted(&value)?;
             Message::Granted(value)
@@ -994,6 +1029,7 @@ pub fn decode_body(buffer: &[u8]) -> Result<Message, ProtocolError> {
             reason: DenyReason(r.u16()?),
             detail: r.bytes()?,
         }),
+        MessageType::IdleStop => Message::IdleStop(IdleStop { idle_ms: r.u64()? }),
         MessageType::Ping => Message::Ping,
         MessageType::Pong => Message::Pong,
         MessageType::Status => Message::Status,

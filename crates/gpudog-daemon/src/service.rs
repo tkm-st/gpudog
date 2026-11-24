@@ -243,6 +243,9 @@ struct SessionInfo {
     hold_limit_ms: u64,
     /// When the hold limit ends, for the one log line that says so.
     hold_deadline: Option<Instant>,
+    /// `Granted::idle_limit_ms` this session was given; 0 until granted,
+    /// and 0 for never.
+    idle_limit_ms: u64,
 }
 
 #[derive(Default)]
@@ -275,6 +278,7 @@ enum Reply {
         gpus: Vec<u32>,
         uuids: Vec<String>,
         hold_limit_ms: u64,
+        idle_limit_ms: u64,
     },
     Queued {
         position: u32,
@@ -466,6 +470,7 @@ impl State {
                         gpus,
                         uuids,
                         hold_limit_ms: self.config.max_hold_ms,
+                        idle_limit_ms: self.config.idle_stop_ms,
                     },
                     None => Reply::Denied {
                         reason: DenyReason::INTERNAL_ERROR,
@@ -481,11 +486,17 @@ impl State {
     /// Keeps the hold limit a grant carries with its session, for the
     /// dashboard and the overdue log line. `now` is the time of the grant.
     fn record_grant(&mut self, id: RequestId, reply: &Reply, now: Instant) {
-        let Reply::Granted { hold_limit_ms, .. } = *reply else {
+        let Reply::Granted {
+            hold_limit_ms,
+            idle_limit_ms,
+            ..
+        } = *reply
+        else {
             return;
         };
         if let Some(session) = self.sessions.get_mut(&id) {
             session.hold_limit_ms = hold_limit_ms;
+            session.idle_limit_ms = idle_limit_ms;
             // Bounded by `MAX_HOLD_LIMIT_MS`, so this cannot overflow.
             session.hold_deadline =
                 (hold_limit_ms > 0).then(|| now + Duration::from_millis(hold_limit_ms));
@@ -650,10 +661,12 @@ fn to_message(reply: Reply) -> Message {
             gpus,
             uuids,
             hold_limit_ms,
+            idle_limit_ms,
         } => Granted {
             gpus,
             uuids,
             hold_limit_ms,
+            idle_limit_ms,
         }
         .into(),
         Reply::Queued { position } => Queued { position }.into(),
@@ -1795,6 +1808,7 @@ async fn handle_acquire(
                 identity,
                 hold_limit_ms: 0,
                 hold_deadline: None,
+                idle_limit_ms: 0,
             },
         );
         state.submit(&submission, now)
@@ -1829,12 +1843,15 @@ async fn handle_acquire(
             gpus,
             uuids,
             hold_limit_ms,
+            idle_limit_ms,
         } => {
-            let limit_note = if *hold_limit_ms > 0 {
-                format!(" hold_limit_ms={hold_limit_ms}")
-            } else {
-                String::new()
-            };
+            let mut limit_note = String::new();
+            if *hold_limit_ms > 0 {
+                limit_note.push_str(&format!(" hold_limit_ms={hold_limit_ms}"));
+            }
+            if *idle_limit_ms > 0 {
+                limit_note.push_str(&format!(" idle_stop_ms={idle_limit_ms}"));
+            }
             shared.log(
                 LogLevel::Access,
                 &format!(
@@ -1988,7 +2005,7 @@ fn snapshot(shared: &Shared) -> StatusReply {
             let command = session.map(|s| s.command.clone()).unwrap_or_default();
             // Fixed fields, the device list, and the command; matches the
             // reservation encoding in `protocol`.
-            let cost = 48 + entry.gpus.len() * 4 + command.len();
+            let cost = 64 + entry.gpus.len() * 4 + command.len();
             if cost > budget {
                 reply.truncated = true;
                 return false;
@@ -2003,6 +2020,8 @@ fn snapshot(shared: &Shared) -> StatusReply {
                 age_ms: u64::try_from(now.saturating_duration_since(entry.since).as_millis())
                     .unwrap_or(u64::MAX),
                 hold_limit_ms: session.map_or(0, |s| s.hold_limit_ms),
+                idle_limit_ms: session.map_or(0, |s| s.idle_limit_ms),
+                idle_ms: 0,
                 position: entry.position,
                 command: command.into_bytes(),
             };

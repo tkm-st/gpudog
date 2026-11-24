@@ -10,7 +10,7 @@ implementation.
 Implemented: `gpudogd`, `gpudog run` (`-n/-g/-t`), `health`, terminal
 `dash`, config loading (SIGHUP reloads the limits and `devices`; socket
 keys need a restart), stderr/journal logging, Debian packaging and the
-Docker image. Protocol version is **7**. GPU process observation and
+Docker image. Protocol version is **8**. GPU process observation and
 PID/start-time process-tree classification run in the daemon. `max_hold_ms` sets a
 hold limit that the daemon sends with each grant and `gpudog run` enforces
 on its command's process tree; the daemon only logs an overdue reservation.
@@ -327,7 +327,7 @@ the gates where it says `verifier`, with any directory under `tmp/` as
 
 | Crate | Module | Responsibility |
 | -- | -- | -- |
-| `gpudog-core` | `protocol/` (`mod`, `codec`, `tests`) | Wire format v7 and framing |
+| `gpudog-core` | `protocol/` (`mod`, `codec`, `tests`) | Wire format v8 and framing |
 | `gpudog-core` | `nvml` | Runtime NVML loading, shared by client and daemon |
 | `gpudog-core` | `device_visibility` | Context-free CUDA ordinal/UUID discovery and grant validation |
 | `gpudog-client` | `client` | Client side of the protocol, `into_reservation` |
@@ -380,10 +380,10 @@ Unit tests live in modules and `<module>/tests.rs`; integration tests are in
 `crates/gpudog-core/tests/golden/` and config fixtures in
 `crates/gpudog-daemon/tests/golden/` preserve the compatibility contract:
 `config_recorded_results.txt` is a frozen record, never regenerated (see
-`docs/developer/building.md`). `scripts/gen-golden-v7.py` is the current
-fixture encoder, independent of the Rust codec. The v3 to v6 fixtures
-document earlier layouts and are not tested; `gen-golden-v7.py` builds on
-the v3 to v6 generators, so keep them.
+`docs/developer/building.md`). `scripts/gen-golden-v8.py` is the current
+fixture encoder, independent of the Rust codec. The v3 to v7 fixtures
+document earlier layouts and are not tested; `gen-golden-v8.py` builds on
+the v3 to v7 generators, so keep them.
 CLI/daemon visibility tests compile a standalone mock driver cdylib into
 `tmp/`. Its unsafe mock ABI is not a workspace module or production fallback.
 Do not edit fixtures merely to make a changed implementation pass.

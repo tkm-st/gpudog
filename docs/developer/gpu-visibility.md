@@ -74,7 +74,7 @@ daemon's `Denied` with `DenyReason::TIMED_OUT`, so the daemon log records the
 denial. Until the first reply, `REPLY_TIMEOUT` bounds the wait; after
 `Queued`, a daemon that stops answering is waited for indefinitely.
 
-Protocol v7 retains v4's rejection of numeric selection and empty candidates. Display
+Protocol v8 retains v4's rejection of numeric selection and empty candidates. Display
 indices remain in grants/status. This is coordination for cooperating
 clients, not proof of another process's visibility or GPU access control.
 
@@ -84,4 +84,4 @@ Unit tests use injected snapshots for ordinal order, missing UUIDs,
 duplicates, bounds, candidate intersection and invalid grants. Real binary
 tests use isolated CUDA/NVML driver doubles to check numeric/UUID/empty
 visibility, MIG failure and daemon startup restrictions without GPUs.
-Current golden frames come from the independent Python v7 generator.
+Current golden frames come from the independent Python v8 generator.

@@ -1,5 +1,5 @@
-//! Protocol-v7 compatibility against the independent Python encoder.
-//! Historical v3-v6 files are retained; older peers fail the handshake.
+//! Protocol-v8 compatibility against the independent Python encoder.
+//! Historical v3-v7 files are retained; older peers fail the handshake.
 
 use gpudog_core::protocol::*;
 
@@ -11,7 +11,7 @@ fn parse_hex(hex: &str) -> Vec<u8> {
 }
 
 fn golden() -> Vec<(&'static str, Vec<u8>)> {
-    include_str!("golden/protocol_v7.txt")
+    include_str!("golden/protocol_v8.txt")
         .lines()
         .map(|line| {
             let (name, hex) = line.split_once(' ').expect("`name hex` line");
@@ -20,9 +20,9 @@ fn golden() -> Vec<(&'static str, Vec<u8>)> {
         .collect()
 }
 
-/// Independently generated malformed v7 frames with numeric error categories.
+/// Independently generated malformed v8 frames with numeric error categories.
 fn malformed() -> Vec<(&'static str, Vec<u8>, ProtocolError)> {
-    include_str!("golden/protocol_v7_malformed.txt")
+    include_str!("golden/protocol_v8_malformed.txt")
         .lines()
         .map(|line| {
             let mut fields = line.split(' ');
@@ -92,14 +92,17 @@ fn expected(name: &str) -> Message {
             gpus: vec![2],
             uuids: vec![U2.into()],
             hold_limit_ms: 0,
+            idle_limit_ms: 0,
         }
         .into(),
         "granted" => Granted {
             gpus: vec![0, 3, 1023],
             uuids: vec![U0.into(), U1.into(), U2.into()],
             hold_limit_ms: 86_400_000,
+            idle_limit_ms: 3_600_000,
         }
         .into(),
+        "idle_stop" => IdleStop { idle_ms: 1_800_000 }.into(),
         "denied" => Denied {
             reason: DenyReason::TIMED_OUT,
             detail: b"no device freed".to_vec(),
@@ -132,6 +135,8 @@ fn expected(name: &str) -> Message {
                 num_gpus: 2,
                 age_ms: 123_456,
                 hold_limit_ms: 3_600_000,
+                idle_limit_ms: 1_800_000,
+                idle_ms: 60_000,
                 position: 0,
                 command: b"python train.py".to_vec(),
             }],
@@ -143,6 +148,8 @@ fn expected(name: &str) -> Message {
                 num_gpus: 3,
                 age_ms: 0,
                 hold_limit_ms: 0,
+                idle_limit_ms: 0,
+                idle_ms: 0,
                 position: 2,
                 command: vec![],
             }],
@@ -225,18 +232,18 @@ fn every_message_type_has_a_golden_frame() {
         .collect();
     types.sort_unstable();
     types.dedup();
-    assert_eq!(types, (1..=10).collect::<Vec<u16>>());
+    assert_eq!(types, (1..=11).collect::<Vec<u16>>());
 }
 
 #[test]
-fn encode_matches_the_independent_v7_bytes() {
+fn encode_matches_the_independent_v8_bytes() {
     for (name, bytes) in golden() {
         assert_eq!(encode(&expected(name)).unwrap(), bytes, "{name}");
     }
 }
 
 #[test]
-fn decode_accepts_the_independent_v7_bytes() {
+fn decode_accepts_the_independent_v8_bytes() {
     for (name, bytes) in golden() {
         assert_eq!(decode_frame(&bytes).unwrap(), expected(name), "{name}");
     }

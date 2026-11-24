@@ -118,7 +118,7 @@ impl VisibleDevices {
     }
 
     /// Resolves parsed local ordinals and constrains count requests. The result
-    /// is a protocol-v7 request containing UUIDs only; an empty view is never
+    /// is a protocol-v8 request containing UUIDs only; an empty view is never
     /// interpreted as an unrestricted request.
     pub fn prepare_acquire(&self, request: &Acquire) -> Result<Acquire, VisibilityError> {
         let mut prepared = request.clone();

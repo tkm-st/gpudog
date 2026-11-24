@@ -123,7 +123,7 @@ must independently be compatible with the chosen runtime.
 *   Install the systemd `.deb` or run a Docker daemon, not both on the same
     socket/runtime directory. Systemd is needed only for the packaged service.
 
-Client and daemon must both speak **protocol v7**. Older peers are refused
+Client and daemon must both speak **protocol v8**. Older peers are refused
 at handshake. See [Installation](../installation.md) and
 [Running the daemon](../administration/daemon.md).
 

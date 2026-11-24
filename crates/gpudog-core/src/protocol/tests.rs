@@ -36,6 +36,7 @@ fn granted(gpus: &[u32]) -> Granted {
         gpus: gpus.to_vec(),
         uuids: gpus.iter().map(|i| format!("GPU-{i}")).collect(),
         hold_limit_ms: 0,
+        idle_limit_ms: 0,
     }
 }
 
@@ -99,7 +100,9 @@ fn round_trips_every_message_type() {
         gpus: vec![0, 3, 1023],
         uuids: uuids(&["GPU-a", "GPU-B-1", "gpu-0c"]),
         hold_limit_ms: 7_200_000,
+        idle_limit_ms: 1_800_000,
     });
+    check_round_trip(IdleStop { idle_ms: 1_800_000 });
     check_round_trip(Acquire {
         selection: GpuSelection::ExplicitUuids,
         num_gpus: 2,
@@ -114,7 +117,9 @@ fn accepts_values_at_the_documented_bounds() {
         gpus: vec![MAX_GPU_COUNT - 1],
         uuids: vec![format!("GPU-{}", "f".repeat(MAX_UUID_SIZE as usize - 4))],
         hold_limit_ms: MAX_HOLD_LIMIT_MS,
+        idle_limit_ms: MAX_HOLD_LIMIT_MS,
     });
+    check_round_trip(IdleStop { idle_ms: u64::MAX });
     check_round_trip(granted(&(0..MAX_GPU_COUNT).collect::<Vec<_>>()));
     check_round_trip(Acquire {
         num_gpus: MAX_GPU_COUNT,
@@ -272,6 +277,7 @@ fn rejects_an_empty_granted_message() {
         decode_err(&[
             0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
             0, 0, 0, 0, 0, 0, 0, 0, // hold limit
+            0, 0, 0, 0, 0, 0, 0, 0, // idle limit
         ]),
         ProtocolError::ValueOutOfRange
     );
@@ -281,12 +287,14 @@ fn rejects_an_empty_granted_message() {
 fn rejects_a_hold_limit_above_the_documented_bound() {
     let over = Granted {
         hold_limit_ms: MAX_HOLD_LIMIT_MS + 1,
+        idle_limit_ms: 0,
         ..granted(&[0])
     };
     assert_eq!(encode_err(over), ProtocolError::ValueOutOfRange);
     let mut reply = StatusReply {
         holders: vec![ReservationInfo {
             hold_limit_ms: MAX_HOLD_LIMIT_MS + 1,
+            idle_limit_ms: 0,
             ..ReservationInfo::default()
         }],
         ..StatusReply::default()
@@ -310,6 +318,7 @@ fn rejects_duplicate_gpu_indices() {
         0x05, 0x00, 0x00, 0x00, b'G', b'P', b'U', b'-', b'a', //
         0x05, 0x00, 0x00, 0x00, b'G', b'P', b'U', b'-', b'b', //
         0, 0, 0, 0, 0, 0, 0, 0, // hold limit
+        0, 0, 0, 0, 0, 0, 0, 0, // idle limit
     ];
     assert_eq!(decode_err(&body), ProtocolError::InvalidMessage);
 }
@@ -415,6 +424,8 @@ fn populated_status_reply() -> StatusReply {
             num_gpus: 2,
             age_ms: 123_456,
             hold_limit_ms: 3_600_000,
+            idle_limit_ms: 1_800_000,
+            idle_ms: 60_000,
             position: 0,
             command: b"python train.py".to_vec(),
         }],
@@ -732,14 +743,33 @@ fn a_status_reply_truncated_mid_entry_is_refused() {
 }
 
 #[test]
-fn the_protocol_version_was_bumped_when_the_hold_limit_joined_the_wire() {
-    // v6 removed the priority from Acquire and ReservationInfo; v7 added the
-    // hold limit to Granted and ReservationInfo. Older peers must be refused
-    // at the handshake rather than left to misparse the new layout.
-    assert_eq!(PROTOCOL_VERSION, 7);
-    assert!(is_known_message_type(MessageType::Status as u16));
+fn rejects_an_idle_limit_above_the_documented_bound() {
+    let over = Granted {
+        idle_limit_ms: MAX_HOLD_LIMIT_MS + 1,
+        ..granted(&[0])
+    };
+    assert_eq!(encode_err(over), ProtocolError::ValueOutOfRange);
+    let reply = StatusReply {
+        holders: vec![ReservationInfo {
+            idle_limit_ms: MAX_HOLD_LIMIT_MS + 1,
+            ..ReservationInfo::default()
+        }],
+        ..StatusReply::default()
+    };
+    assert_eq!(encode_err(reply), ProtocolError::ValueOutOfRange);
+}
+
+#[test]
+fn the_protocol_version_was_bumped_when_the_idle_stop_joined_the_wire() {
+    // v7 added the hold limit to Granted and ReservationInfo; v8 added the
+    // idle limit to both, the idle time to ReservationInfo, and IdleStop.
+    // Older peers must be refused at the handshake rather than left to
+    // misparse the new layout.
+    assert_eq!(PROTOCOL_VERSION, 8);
     assert!(is_known_message_type(MessageType::StatusReply as u16));
-    assert!(!is_known_message_type(11));
+    assert!(is_known_message_type(MessageType::IdleStop as u16));
+    assert_eq!(MessageType::IdleStop as u16, 11);
+    assert!(!is_known_message_type(12));
 }
 
 #[test]
@@ -822,6 +852,7 @@ fn a_non_utf8_uuid_on_the_wire_is_an_invalid_message() {
         0x05, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // gpus [0]
         0x01, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, b'G', b'P', b'U', b'-', 0xFF, //
         0, 0, 0, 0, 0, 0, 0, 0, // hold limit
+        0, 0, 0, 0, 0, 0, 0, 0, // idle limit
     ];
     assert_eq!(decode_err(&body), ProtocolError::InvalidMessage);
 }
