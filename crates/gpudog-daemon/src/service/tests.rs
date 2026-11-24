@@ -98,6 +98,7 @@ async fn gpu_processes_without_readable_owners_are_reported_once() {
         gpu_uuid: "GPU-static-0".into(),
         pid: 99,
         used_memory: Some(42),
+        sm_utilization: None,
     };
     let (sink, events) = recording_log();
     let (service, source) = observed_service_logging(Ok(vec![process.clone()]), sink);
@@ -128,6 +129,7 @@ async fn external_process_is_shown_and_waited_for_even_without_proc_metadata() {
         gpu_uuid: "GPU-static-0".into(),
         pid: 99,
         used_memory: Some(42),
+        sm_utilization: None,
     };
     let (service, source) = observed_service(Ok(vec![process]));
     eventually(|| service.snapshot().observation_age_ms.is_some()).await;

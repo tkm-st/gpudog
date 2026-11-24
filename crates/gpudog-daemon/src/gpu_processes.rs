@@ -31,6 +31,9 @@ pub struct GpuProcess {
     pub pid: u32,
     /// Bytes, when the driver reports it.
     pub used_memory: Option<u64>,
+    /// Highest SM utilization, in percent, NVML sampled for this process
+    /// since the previous query; `None` when the GPU does not report it.
+    pub sm_utilization: Option<u32>,
 }
 
 /// Where the daemon's process list comes from: NVML in production, a fixed
@@ -139,6 +142,7 @@ impl NvmlProcessSource {
                         gpu_uuid: uuid.clone(),
                         pid: info.pid,
                         used_memory: used,
+                        sm_utilization: None,
                     }),
                 }
             }

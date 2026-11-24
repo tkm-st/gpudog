@@ -5,6 +5,7 @@ pub mod config;
 pub mod daemon_log;
 pub mod gpu_inventory;
 pub mod gpu_processes;
+pub mod idle;
 pub mod peer_credentials;
 pub mod process_watcher;
 pub mod scheduler;

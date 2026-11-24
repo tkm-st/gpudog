@@ -24,6 +24,8 @@ pub struct ObservedProcess {
     pub row: ProcessRow,
     pub start_time: Option<u64>,
     pub owner: Option<u64>,
+    /// [`GpuProcess::sm_utilization`].
+    pub sm_utilization: Option<u32>,
 }
 
 #[derive(Default)]
@@ -40,6 +42,13 @@ impl ProcessTracker {
             .iter()
             .map(|(&identity, &owner)| (identity, owner))
             .collect()
+    }
+
+    /// Whether the last [`Self::observe`] found `root`'s own process, so
+    /// that its descendants could be told apart from other processes.
+    pub fn resolved(&self, root: &ReservationRoot) -> bool {
+        root.identity
+            .is_some_and(|identity| self.known.get(&identity) == Some(&root.id))
     }
 
     /// Classifies `processes` on `devices`; processes on any other GPU are
@@ -129,6 +138,7 @@ impl ProcessTracker {
                     .into_bytes()
             });
             rows.push(ObservedProcess {
+                sm_utilization: process.sm_utilization,
                 start_time: fact.map(|f| f.identity.start_time),
                 owner: owner.ok().flatten(),
                 row: ProcessRow {

@@ -37,6 +37,7 @@ fn gpu(pid: u32, index: u32) -> GpuProcess {
         nvml_index: index,
         gpu_uuid: format!("GPU-static-{index}"),
         used_memory: Some(42),
+        sm_utilization: None,
     }
 }
 
@@ -198,4 +199,16 @@ fn each_reservation_remembers_at_most_its_share_of_descendants() {
     assert!(known
         .iter()
         .any(|&(identity, owner)| identity.pid == 90_000 && owner == 2));
+}
+
+#[test]
+fn a_root_is_resolved_only_while_procfs_shows_it() {
+    let mut tracker = ProcessTracker::default();
+    let devices = StaticInventory::with_count(2).devices().to_vec();
+    tracker.observe(&[], &devices, &[root()], &tree());
+    assert!(tracker.resolved(&root()));
+    let mut gone = tree();
+    gone.remove(&10);
+    tracker.observe(&[], &devices, &[root()], &gone);
+    assert!(!tracker.resolved(&root()));
 }
