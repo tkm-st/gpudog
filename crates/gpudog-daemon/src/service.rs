@@ -1322,6 +1322,16 @@ async fn observation_loop(shared: Arc<Shared>, source: Arc<dyn GpuProcessSource>
                             }
                         }
                         let recovered = !state.observation.error.is_empty();
+                        // Whether a job used its GPUs while the observation
+                        // was stuck is unknown: that time is not idle time.
+                        if state.observation.completed.is_some_and(|previous| {
+                            idle::observation_gap_too_long(
+                                now.saturating_duration_since(previous),
+                                state.observation.period,
+                            )
+                        }) {
+                            state.reset_idle();
+                        }
                         state.observation.completed = Some(Instant::now());
                         state.observation.error.clear();
                         let owners = busy_owners(&busy, &rows);
@@ -2058,7 +2068,7 @@ async fn send_idle_stop(shared: &Shared, line: &mut Line, peer: &PeerCredentials
             LogLevel::Warning,
             &format!(
                 "{peer} idle for {idle_ms} ms; could not ask the client to stop its command \
-                 within {} seconds; the reservation is kept until the client closes it",
+                 (no progress in {} seconds); the reservation is kept until the client closes it",
                 IDLE_STOP_WRITE_TIMEOUT.as_secs()
             ),
         ),

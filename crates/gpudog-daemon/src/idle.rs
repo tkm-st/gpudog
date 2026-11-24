@@ -125,5 +125,12 @@ impl IdleClock {
     }
 }
 
+/// Whether two successful observations, `gap` apart with observations due
+/// every `period`, left too long unseen to count it as idle. Allows for a
+/// few late or failed-and-retried queries.
+pub fn observation_gap_too_long(gap: Duration, period: Duration) -> bool {
+    gap > period.saturating_mul(3) + Duration::from_secs(5)
+}
+
 #[cfg(test)]
 mod tests;

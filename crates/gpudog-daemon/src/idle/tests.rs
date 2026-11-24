@@ -170,3 +170,13 @@ fn a_zero_limit_never_fires() {
         None
     );
 }
+
+#[test]
+fn a_stalled_observation_leaves_too_long_a_gap() {
+    let second = Duration::from_secs(1);
+    assert!(!observation_gap_too_long(Duration::from_secs(8), second));
+    assert!(observation_gap_too_long(Duration::from_secs(9), second));
+    let hour = Duration::from_secs(3600);
+    assert!(!observation_gap_too_long(3 * hour, hour));
+    assert!(observation_gap_too_long(4 * hour, hour));
+}
