@@ -133,7 +133,7 @@ What remains from earlier versions:
     [Compatibility rules](protocol.md#compatibility-rules). The v3 to v7
     golden fixtures in `crates/gpudog-core/tests/golden/` document earlier
     wire layouts and are not tested. Their generators
-    (`scripts/gen-golden-v3.py` to `gen-golden-v6.py`) stay because
+    (`scripts/gen-golden-v3.py` to `gen-golden-v7.py`) stay because
     `gen-golden-v8.py` builds on them. Only version 8 is spoken and tested.
 *   Earlier daemons wrote log files. The `log_directory` key and
     `--log-directory` option are accepted with a warning and ignored (see
