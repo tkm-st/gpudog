@@ -2190,7 +2190,7 @@ fn snapshot(shared: &Shared) -> StatusReply {
                 idle_limit_ms: session.map_or(0, |s| s.idle_limit_ms),
                 idle_ms: session
                     .and_then(|s| s.idle.as_ref())
-                    .map_or(0, |clock| millis(clock.idle(now))),
+                    .map_or(0, |clock| millis(clock.idle())),
                 position: entry.position,
                 command: command.into_bytes(),
             };

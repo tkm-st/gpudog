@@ -84,6 +84,8 @@ pub fn activity(
 pub struct IdleClock {
     limit: Duration,
     since: Option<Instant>,
+    /// The latest idle observation of the current idle stretch.
+    seen: Option<Instant>,
     fired: bool,
 }
 
@@ -93,6 +95,7 @@ impl IdleClock {
         Self {
             limit,
             since: Some(granted),
+            seen: None,
             fired: false,
         }
     }
@@ -102,9 +105,11 @@ impl IdleClock {
     pub fn observe(&mut self, activity: Activity, now: Instant) -> Option<Duration> {
         if activity != Activity::Idle {
             self.since = None;
+            self.seen = None;
             return None;
         }
         let since = *self.since.get_or_insert(now);
+        self.seen = Some(now);
         let idle = now.saturating_duration_since(since);
         if self.limit.is_zero() || self.fired || idle < self.limit {
             return None;
@@ -117,12 +122,17 @@ impl IdleClock {
     /// idle time starts again at the next idle observation.
     pub fn reset(&mut self) {
         self.since = None;
+        self.seen = None;
     }
 
-    /// Idle time at `now`, or zero when not idle.
-    pub fn idle(&self, now: Instant) -> Duration {
-        self.since
-            .map_or(Duration::ZERO, |since| now.saturating_duration_since(since))
+    /// Idle time at the latest observation, or zero when that was not idle
+    /// or none has been made yet. It does not run on between observations,
+    /// so a stalled observation does not show time that may yet be reset.
+    pub fn idle(&self) -> Duration {
+        match (self.since, self.seen) {
+            (Some(since), Some(seen)) => seen.saturating_duration_since(since),
+            _ => Duration::ZERO,
+        }
     }
 }
 

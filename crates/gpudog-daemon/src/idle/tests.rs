@@ -139,10 +139,10 @@ fn activity_restarts_the_clock() {
         let mut clock = IdleClock::new(limit, granted);
         let at = |s| granted + Duration::from_secs(s);
         assert_eq!(clock.observe(interruption, at(30)), None);
-        assert_eq!(clock.idle(at(30)), Duration::ZERO);
+        assert_eq!(clock.idle(), Duration::ZERO);
         assert_eq!(clock.observe(Activity::Idle, at(40)), None);
         assert_eq!(clock.observe(Activity::Idle, at(99)), None);
-        assert_eq!(clock.idle(at(99)), Duration::from_secs(59));
+        assert_eq!(clock.idle(), Duration::from_secs(59));
         assert_eq!(
             clock.observe(Activity::Idle, at(100)),
             Some(Duration::from_secs(60))
@@ -156,9 +156,24 @@ fn a_reset_restarts_the_clock() {
     let at = |s| granted + Duration::from_secs(s);
     let mut clock = IdleClock::new(Duration::from_secs(60), granted);
     clock.reset();
-    assert_eq!(clock.idle(at(70)), Duration::ZERO);
+    assert_eq!(clock.idle(), Duration::ZERO);
     assert_eq!(clock.observe(Activity::Idle, at(70)), None);
-    assert_eq!(clock.idle(at(100)), Duration::from_secs(30));
+    assert_eq!(clock.observe(Activity::Idle, at(100)), None);
+    assert_eq!(clock.idle(), Duration::from_secs(30));
+}
+
+#[test]
+fn the_idle_time_stops_at_the_latest_observation() {
+    let granted = Instant::now();
+    let at = |s| granted + Duration::from_secs(s);
+    let mut clock = IdleClock::new(Duration::from_secs(600), granted);
+    // Nothing observed since the grant: nothing to show yet.
+    assert_eq!(clock.idle(), Duration::ZERO);
+    assert_eq!(clock.observe(Activity::Idle, at(20)), None);
+    // However long the next observation takes, the shown time stays put.
+    assert_eq!(clock.idle(), Duration::from_secs(20));
+    assert_eq!(clock.observe(Activity::Idle, at(25)), None);
+    assert_eq!(clock.idle(), Duration::from_secs(25));
 }
 
 #[test]
