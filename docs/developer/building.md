@@ -240,12 +240,33 @@ $ python3 scripts/release-check.py
 
 `crates/gpudog-core/tests/protocol_golden.rs` checks the v8 wire contract,
 and `crates/gpudog-daemon/tests/config_compat.rs` checks config
-compatibility. Fixtures are
-kept in this repository.
-`scripts/gen-golden-v8.py` generates current frames with its own Python
-encoder, not the Rust codec, so the two check each other. The v3 to v7
-fixtures document earlier wire layouts and are not tested;
-`gen-golden-v8.py` builds on the v3 to v7 generators, so keep them.
+compatibility. Fixtures are kept in this repository.
+`scripts/gen-golden.py` generates the current version's frames with its
+own Python encoder, not the Rust codec, so the two check each other. It
+writes only the current version's fixtures.
+
+A change to the wire layout, an enum value or the protocol version needs
+the maintainer's approval (see "Extra human decisions" in `AGENTS.md`).
+Once approved:
+
+1.  Change `PROTOCOL_VERSION` and the codec in
+    `crates/gpudog-core/src/protocol/`.
+2.  In `scripts/gen-golden.py`, set `VERSION` to the same number and change
+    the builders from the layout in [Message types](protocol.md#message-types), not from
+    the Rust code. Keep the cases that still test something, and add cases
+    for the new fields, including a frame in the previous layout that must
+    now be refused.
+3.  Run `python3 scripts/gen-golden.py crates/gpudog-core/tests/golden`,
+    delete the previous version's `protocol_v*.txt` files, and point
+    `protocol_golden.rs` at the new ones (`include_str!`, and `expected()`
+    for new or changed messages).
+4.  Add a bullet for the version under
+    [Compatibility rules](protocol.md#compatibility-rules), a line to
+    `CHANGELOG.md`, and grep `docs/`, `notes/` and `AGENTS.md` for the old
+    version number: `scripts/check-repo-text.py` checks only a few phrases.
+
+Compatibility rules summarises what each version changed; the full earlier
+layouts and fixtures are in git history.
 
 `config_recorded_results.txt` is a frozen record of what an earlier
 loader made of each case in `config_cases.txt`; it is never regenerated.

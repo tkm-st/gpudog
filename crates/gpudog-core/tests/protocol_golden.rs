@@ -1,5 +1,5 @@
-//! Protocol-v8 compatibility against the independent Python encoder.
-//! Historical v3-v7 files are retained; older peers fail the handshake.
+//! Protocol-v8 compatibility against the independent Python encoder,
+//! `scripts/gen-golden.py`. Older peers fail the handshake.
 
 use gpudog_core::protocol::*;
 

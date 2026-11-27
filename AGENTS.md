@@ -388,10 +388,11 @@ Unit tests live in modules and `<module>/tests.rs`; integration tests are in
 `crates/gpudog-core/tests/golden/` and config fixtures in
 `crates/gpudog-daemon/tests/golden/` preserve the compatibility contract:
 `config_recorded_results.txt` is a frozen record, never regenerated (see
-`docs/developer/building.md`). `scripts/gen-golden-v8.py` is the current
-fixture encoder, independent of the Rust codec. The v3 to v7 fixtures
-document earlier layouts and are not tested; `gen-golden-v8.py` builds on
-the v3 to v7 generators, so keep them.
+`docs/developer/building.md`). `scripts/gen-golden.py` is the fixture
+encoder, independent of the Rust codec, and writes only the current
+version's fixtures; a layout change edits it in place (steps in
+`docs/developer/building.md`). `docs/developer/protocol.md` summarises each
+version's changes; full earlier layouts are in git history.
 CLI/daemon visibility tests compile a standalone mock driver cdylib into
 `tmp/`. Its unsafe mock ABI is not a workspace module or production fallback.
 Do not edit fixtures merely to make a changed implementation pass.
