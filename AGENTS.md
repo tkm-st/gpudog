@@ -74,8 +74,8 @@ documentation checks, not for ordinary Cargo tests.
 `scripts/check.sh` is the single local definition of the gates; its cargo
 gates match `.github/workflows/ci.yml` (CI additionally runs actionlint,
 `scripts/test-actions.py` and cargo-deny, with pinned tool versions): `quick` (fmt, clippy, build, tests), `full`
-(plus release build and tests), `release`, `text` (markdownlint and
-`scripts/check-repo-text.py`) and `docs` (`text` plus Zensical). It accepts `--target-dir`, `--repeat N`,
+(plus release build and tests), `release`, `text` (markdownlint,
+`scripts/check-repo-text.py` and `scripts/gen-golden.py --check`) and `docs` (`text` plus Zensical). It accepts `--target-dir`, `--repeat N`,
 `--test FILE` (one integration test file) and `--filter NAME` (test names), and prints `GATE <name>: PASS|FAIL` lines. When you change a
 gate, change `check.sh` and propose the matching CI change to the maintainer. The underlying commands:
 
@@ -97,6 +97,7 @@ python3 scripts/release-check.py --gpu   # also actual driver/GPU checks
 uvx zensical build --clean
 npx --yes markdownlint-cli2@0.24.0 "**/*.md" "#target" "#tmp" "#externals" "#build" "#.worktrees"
 python3 scripts/check-repo-text.py      # AGENTS.md paths, stated protocol version
+python3 scripts/gen-golden.py --check   # protocol fixtures match their generator
 scripts/precommit-check.sh               # staged index, before each commit
 ```
 

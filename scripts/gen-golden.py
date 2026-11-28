@@ -15,9 +15,14 @@ each version are summarised in docs/developer/protocol.md; full earlier
 layouts are in git history.
 
 Usage: python3 scripts/gen-golden.py <existing-output-directory>
-The canonical fixtures are in crates/gpudog-core/tests/golden/.
+       python3 scripts/gen-golden.py --check
+The canonical fixtures are in crates/gpudog-core/tests/golden/. --check,
+run by `scripts/check.sh text` and CI, fails when they differ from what
+this script writes, when another version's fixtures remain, or when
+PROTOCOL_VERSION is not VERSION.
 """
 from pathlib import Path
+import re
 import struct
 import sys
 
@@ -242,12 +247,51 @@ malformed += [
     ("idle_stop_trailing_byte", frame(idle_stop(0) + u8(0)), 4),
 ]
 
-if len(sys.argv) != 2 or not Path(sys.argv[1]).is_dir():
-    sys.exit(f"usage: {sys.argv[0]} <existing-output-directory>")
-output = Path(sys.argv[1])
-with (output / f"protocol_v{VERSION}.txt").open("w") as stream:
-    for name, body in valid:
-        stream.write(f"{name} {frame(body)}\n")
-with (output / f"protocol_v{VERSION}_malformed.txt").open("w") as stream:
-    for name, body, code in malformed:
-        stream.write(f"{name} {body} {code}\n")
+ROOT = Path(__file__).resolve().parent.parent
+GOLDEN = ROOT / "crates/gpudog-core/tests/golden"
+PROTOCOL_SOURCE = ROOT / "crates/gpudog-core/src/protocol/mod.rs"
+
+files = {
+    f"protocol_v{VERSION}.txt":
+        "".join(f"{name} {frame(body)}\n" for name, body in valid),
+    f"protocol_v{VERSION}_malformed.txt":
+        "".join(f"{name} {body} {code}\n" for name, body, code in malformed),
+}
+
+
+def check():
+    """Problems with the committed fixtures, one line each."""
+    problems = []
+    for name, text in files.items():
+        path = GOLDEN / name
+        if not path.is_file():
+            problems.append(f"{path.relative_to(ROOT)}: missing")
+        elif path.read_bytes() != text.encode():
+            problems.append(f"{path.relative_to(ROOT)}: differs from what "
+                            "scripts/gen-golden.py writes")
+    for path in sorted(GOLDEN.glob("protocol_v*.txt")):
+        if path.name not in files:
+            problems.append(f"{path.relative_to(ROOT)}: not version {VERSION}; delete it")
+    # The same pattern as in scripts/check-repo-text.py.
+    match = re.search(r"pub const PROTOCOL_VERSION: u32 = (\d+);",
+                      PROTOCOL_SOURCE.read_text())
+    if not match or int(match.group(1)) != VERSION:
+        found = match.group(1) if match else "no PROTOCOL_VERSION"
+        problems.append(f"{PROTOCOL_SOURCE.relative_to(ROOT)}: {found}, but "
+                        f"scripts/gen-golden.py has VERSION = {VERSION}")
+    return problems
+
+
+if sys.argv[1:] == ["--check"]:
+    problems = check()
+    for problem in problems:
+        print(problem, file=sys.stderr)
+    if problems:
+        sys.exit("fix the above; regenerate the fixtures with "
+                 "python3 scripts/gen-golden.py crates/gpudog-core/tests/golden")
+    print(f"protocol fixtures match scripts/gen-golden.py (v{VERSION})")
+elif len(sys.argv) == 2 and Path(sys.argv[1]).is_dir():
+    for name, text in files.items():
+        (Path(sys.argv[1]) / name).write_bytes(text.encode())
+else:
+    sys.exit(f"usage: {sys.argv[0]} <existing-output-directory> | --check")

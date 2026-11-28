@@ -100,7 +100,7 @@ Zensical version is pinned more tightly:
 | `quick` | `cargo fmt`, Clippy, build and tests | cargo, a C compiler (`cc`) |
 | `full` | `quick`, plus the release build and release tests | as `quick` |
 | `release` | the release build and release tests | as `quick` |
-| `text` | markdownlint and `scripts/check-repo-text.py` (quoted paths in `AGENTS.md`, and the protocol version stated in the instructions, docs and notes) | npx, python3, git |
+| `text` | markdownlint, `scripts/check-repo-text.py` (quoted paths in `AGENTS.md`, and the protocol version stated in the instructions, docs and notes) and `scripts/gen-golden.py --check` (the protocol fixtures match their generator) | npx, python3, git |
 | `docs` | `text`, plus the Zensical build | npx, python3, git, uv |
 
 Options: `--target-dir DIR` (for example a directory under `tmp/`),
@@ -172,8 +172,8 @@ The independent gates are:
 *   Locked workspace builds and tests in both Debug and Release profiles,
     using the stable toolchain from `rust-toolchain.toml`.
 *   Workflow syntax checks with actionlint, release guard tests with a mock
-    GitHub CLI, Markdown lint, `scripts/check-repo-text.py`, and a Zensical
-    build.
+    GitHub CLI, Markdown lint, `scripts/check-repo-text.py`, the protocol
+    fixture check (`scripts/gen-golden.py --check`), and a Zensical build.
 *   Bookworm production client/daemon container checks with CPU driver doubles.
 *   The ELF checker tests and the complete glibc 2.28 release checks, including
     the pinned Rust 1.88.0 build, minimum-runtime installation and CPU container
@@ -259,7 +259,11 @@ Once approved:
 3.  Run `python3 scripts/gen-golden.py crates/gpudog-core/tests/golden`,
     delete the previous version's `protocol_v*.txt` files, and point
     `protocol_golden.rs` at the new ones (`include_str!`, and `expected()`
-    for new or changed messages).
+    for new or changed messages). Then run
+    `python3 scripts/gen-golden.py --check` (also part of the `text` gate
+    and CI): it fails while the fixtures are missing or differ from the
+    script's output, another version's fixtures remain, or
+    `PROTOCOL_VERSION` and `VERSION` disagree.
 4.  Add a bullet for the version under
     [Compatibility rules](protocol.md#compatibility-rules), a line to
     `CHANGELOG.md`, and grep `docs/`, `notes/` and `AGENTS.md` for the old

@@ -15,7 +15,8 @@
 #   full     quick plus release build and release tests (scheduler/service/
 #            watcher/lifetime changes)
 #   release  release build and tests only
-#   text     markdownlint and scripts/check-repo-text.py
+#   text     markdownlint, scripts/check-repo-text.py and the protocol
+#            fixture check (scripts/gen-golden.py --check)
 #   docs     text plus the documentation build
 #
 #   --target-dir DIR  cargo target directory; subagents must pass their own,
@@ -135,6 +136,7 @@ case "$tier" in
     text | docs)
         gate markdownlint lint_markdown
         gate repo-text python3 scripts/check-repo-text.py
+        gate golden python3 scripts/gen-golden.py --check
         if [ "$tier" = docs ]; then
             gate zensical uvx zensical build --clean
         fi

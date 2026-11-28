@@ -138,6 +138,8 @@ jobs:
         run: npx --yes markdownlint-cli2@0.24.0 '**/*.md' '#target' '#tmp' '#externals' '#build'
       - name: Check repository text
         run: python3 scripts/check-repo-text.py
+      - name: Check the protocol fixtures against their generator
+        run: python3 scripts/gen-golden.py --check
       - name: Install documentation and workflow test tools
         run: |
           python3 -m venv tmp/docs-tools
